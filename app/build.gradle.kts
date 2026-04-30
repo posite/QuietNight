@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.quietnight"
-        minSdk = 27
+        minSdk = 28
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
