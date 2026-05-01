@@ -24,8 +24,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,9 +62,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkPermissions()
+        viewModel.handleIntent(SnoreIntent.LoadHistory)
         setContent {
             QuietNightTheme {
-                QuietNightApp()
+                QuietNightApp(viewModel)
             }
         }
     }
@@ -119,10 +122,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun QuietNightApp() {
+fun QuietNightApp(viewModel: SleepViewModel) {
     val navController = rememberNavController()
-
-    Box(modifier = Modifier.fillMaxSize()) {
+    val state by viewModel.state.collectAsState()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 12.dp)
+    ) {
 
         NavHost(
             navController = navController,
@@ -132,13 +139,19 @@ fun QuietNightApp() {
                 .padding(bottom = 68.dp)
         ) {
             composable(Screen.Home.route) {
-
+                HomeScreen(state) {
+                    val intent =
+                        if (state.isMonitoring) SnoreIntent.StopMonitoring else SnoreIntent.StartMonitoring
+                    viewModel.handleIntent(intent)
+                }
             }
             composable(Screen.Monitor.route) {
-
+                MonitorScreen(state) {
+                    viewModel.handleIntent(SnoreIntent.StopMonitoring)
+                }
             }
             composable(Screen.Weekly.route) {
-
+                WeeklyScreen(state)
             }
         }
 
@@ -152,7 +165,7 @@ fun QuietNightApp() {
                 .height(68.dp)
                 .border(
                     width = 0.5.dp,
-                    color = Color.Cyan,
+                    color = MaterialTheme.colorScheme.primary,
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                 ),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -195,14 +208,14 @@ private fun BottomNavItem(
         Icon(
             imageVector = screen.icon,
             contentDescription = screen.label,
-            tint = if (selected) Color.Black else Color.Gray,
+            tint = if (selected) MaterialTheme.colorScheme.onBackground else Color.Gray,
             modifier = Modifier.size(22.dp)
         )
         Spacer(Modifier.height(3.dp))
         Text(
             screen.label,
             fontSize = 10.sp,
-            color = if (selected) Color.Black else Color.Gray
+            color = if (selected) MaterialTheme.colorScheme.onBackground else Color.Gray
         )
     }
 }
