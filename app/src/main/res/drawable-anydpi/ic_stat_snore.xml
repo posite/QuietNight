@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512"
+    android:tint="#FFFFFF"> <!-- 시스템 테마에 따른 색상 적용 -->
+
+  <group
+      android:scaleX="1.0"
+      android:scaleY="1.0"
+      android:translateX="0"
+      android:translateY="0">
+
+    <!-- 1. 초승달: 위치를 유지하며 크기를 꽉 채움 -->
+    <path
+        android:pathData="M345.5,120C345.5,120 280,140 280,256C280,372 345.5,392 345.5,392C310,415 220,400 180,320C140,240 180,145 220,110C260,75 310,95 345.5,120Z"
+        android:fillColor="#FFFFFF"/>
+
+    <!-- 2. 음파: 선 두께를 30으로 키워 가독성 확보 -->
+    <path
+        android:pathData="M120,256H160L185,220L215,292L245,190L275,322L305,230L335,280L360,256H400"
+        android:strokeLineJoin="round"
+        android:strokeWidth="30"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"/>
+  </group>
+</vector>

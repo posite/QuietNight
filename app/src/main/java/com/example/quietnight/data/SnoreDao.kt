@@ -10,6 +10,6 @@ interface SnoreDao {
     @Insert
     suspend fun insertSession(session: SleepSession)
 
-    @Query("SELECT * FROM sleep_sessions ORDER BY date DESC LIMIT :days")
-    fun getHistory(days: Int): Flow<List<SleepSession>>
+    @Query("SELECT * FROM sleep_sessions ORDER BY date DESC")
+    fun getHistory(): Flow<List<SleepSession>>
 }
