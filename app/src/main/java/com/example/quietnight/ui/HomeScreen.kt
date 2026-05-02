@@ -73,7 +73,7 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
 
             Button(
                 onClick = {
-
+                    onMonitorClicked()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
