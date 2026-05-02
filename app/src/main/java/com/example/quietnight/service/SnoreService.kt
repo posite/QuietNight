@@ -7,14 +7,17 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.widget.RemoteViews
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.LifecycleService
 import com.example.quietnight.R
 import com.example.quietnight.ui.MainActivity
@@ -35,15 +38,33 @@ class SnoreService : LifecycleService() {
     private val CHANNEL_ID = "QuietNightChannel"
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
+    private lateinit var cachedBitmap: Bitmap
+    private lateinit var openAppPendingIntent: PendingIntent
 
     companion object {
         val dbFlow = MutableStateFlow(0)
         val logFlow = MutableSharedFlow<String>()
+        private const val NOTIFICATION_ID = 1004
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        cachedBitmap = ContextCompat.getDrawable(this, R.drawable.ic_app_foreground)!!.toBitmap()
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        openAppPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        startForeground(1, createNotification())
+        val initialNotification = createNotification()
+        startForeground(NOTIFICATION_ID, initialNotification)
         startAnalysis()
         return START_STICKY
     }
@@ -71,6 +92,13 @@ class SnoreService : LifecycleService() {
 
         recordingJob = CoroutineScope(Dispatchers.IO).launch {
             val audioData = ShortArray(bufferSize)
+            launch {
+                dbFlow.collect { db ->
+                    updateNotification(db)
+                    delay(1000)
+                }
+            }
+
             while (isActive) {
                 val readResult = audioRecord?.read(audioData, 0, bufferSize) ?: 0
                 if (readResult > 0) {
@@ -93,29 +121,47 @@ class SnoreService : LifecycleService() {
     }
 
     private fun createNotification(): Notification {
-        val channel = NotificationChannel(CHANNEL_ID, "수면 관리", NotificationManager.IMPORTANCE_LOW)
+        val notificationSmallLayout = RemoteViews(packageName, R.layout.notification_decibel)
+        val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel)
+
+
+        val channel = NotificationChannel(CHANNEL_ID, "수면 관리", NotificationManager.IMPORTANCE_HIGH)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
 
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            // 이미 실행 중인 Activity를 재사용
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            // 또는
-            // flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val openAppPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val bitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_app_foreground)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("QuietNight 작동 중")
             .setSmallIcon(R.drawable.ic_stat_snore)
             .setOngoing(true)
             .setContentIntent(openAppPendingIntent)
-            .setLargeIcon(bitmap)
+            .setLargeIcon(cachedBitmap)
+            .setOnlyAlertOnce(true)
+            .setCustomContentView(notificationSmallLayout)
+            .setCustomBigContentView(notificationLayout)
             .build()
+    }
+
+    private fun updateNotification(decibel: Int) {
+        val notificationSmallLayout =
+            RemoteViews(packageName, R.layout.notification_decibel).apply {
+                setTextViewText(R.id.tv_decibel, decibel.toString()) // 텍스트 업데이트
+            }
+        val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel).apply {
+            setTextViewText(R.id.tv_decibel, decibel.toString())
+        }
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("QuietNight 작동 중")
+            .setSmallIcon(R.drawable.ic_stat_snore)
+            .setOngoing(true)
+            .setContentIntent(openAppPendingIntent)
+            .setLargeIcon(cachedBitmap)
+            .setOnlyAlertOnce(true)
+            .setCustomContentView(notificationSmallLayout)
+            .setCustomBigContentView(notificationLayout)
+            .build()
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
     override fun onDestroy() {
