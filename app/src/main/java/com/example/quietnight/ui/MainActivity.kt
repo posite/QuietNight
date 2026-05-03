@@ -42,6 +42,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.quietnight.data.SleepSession
 import com.example.quietnight.ui.theme.QuietNightTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -125,6 +126,10 @@ class MainActivity : ComponentActivity() {
 fun QuietNightApp(viewModel: SleepViewModel) {
     val navController = rememberNavController()
     val state by viewModel.state.collectAsState()
+    //val context = LocalContext.current
+
+    var startTime = 0L
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -138,16 +143,30 @@ fun QuietNightApp(viewModel: SleepViewModel) {
                 .fillMaxSize()
                 .padding(bottom = 68.dp)
         ) {
+
             composable(Screen.Home.route) {
                 HomeScreen(state) {
-                    val intent =
-                        if (state.isMonitoring) SnoreIntent.StopMonitoring else SnoreIntent.StartMonitoring
-                    viewModel.handleIntent(intent)
+                    if (state.isMonitoring) {
+                        viewModel.handleIntent(
+                            createSnoreSessionIntent(
+                                startTime,
+                                state.todaySnoreMax
+                            )
+                        )
+                    } else {
+                        startTime = System.currentTimeMillis()
+                        viewModel.handleIntent(SnoreIntent.StartMonitoring)
+                    }
                 }
             }
             composable(Screen.Monitor.route) {
                 MonitorScreen(state) {
-                    viewModel.handleIntent(SnoreIntent.StopMonitoring)
+                    viewModel.handleIntent(
+                        createSnoreSessionIntent(
+                            startTime,
+                            state.todaySnoreMax
+                        )
+                    )
                 }
             }
             composable(Screen.Weekly.route) {
@@ -190,6 +209,18 @@ fun QuietNightApp(viewModel: SleepViewModel) {
             }
         }
     }
+}
+
+private fun createSnoreSessionIntent(startTime: Long, score: Int): SnoreIntent.StopMonitoring {
+    val now = System.currentTimeMillis()
+    return SnoreIntent.StopMonitoring(
+        SleepSession(
+            date = now,
+            score = score,
+            snoreMinutes = ((now - startTime) / 1000 / 60).toInt(),
+            positionStatsJson = "등:82,옆:18"
+        )
+    )
 }
 
 @Composable

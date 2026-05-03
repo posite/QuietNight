@@ -143,7 +143,7 @@ class SnoreService : LifecycleService() {
     private fun updateNotification(decibel: Int) {
         val notificationSmallLayout =
             RemoteViews(packageName, R.layout.notification_decibel).apply {
-                setTextViewText(R.id.tv_decibel, decibel.toString()) // 텍스트 업데이트
+                setTextViewText(R.id.tv_decibel, decibel.toString())
             }
         val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel).apply {
             setTextViewText(R.id.tv_decibel, decibel.toString())

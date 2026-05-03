@@ -4,7 +4,7 @@ import com.example.quietnight.data.SleepSession
 
 sealed class SnoreIntent {
     data object StartMonitoring : SnoreIntent()
-    data object StopMonitoring : SnoreIntent()
+    data class StopMonitoring(val session: SleepSession) : SnoreIntent()
     data object LoadHistory : SnoreIntent()
 }
 
@@ -12,6 +12,7 @@ data class SnoreState(
     // Home State
     val todayScore: Int = 0,
     val todaySnoreMin: Int = 0,
+    val todaySnoreMax: Int = 0,
     val positionStats: Map<String, Float> = emptyMap(),
 
     // Monitor State

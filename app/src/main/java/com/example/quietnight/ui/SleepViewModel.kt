@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.max
+import kotlin.math.min
 
 @HiltViewModel
 class SleepViewModel @Inject constructor(
@@ -28,12 +30,18 @@ class SleepViewModel @Inject constructor(
         // Service 데이터 구독
         viewModelScope.launch {
             SnoreService.dbFlow.collect { db ->
-                _state.update { it.copy(currentDb = db) }
+                _state.update {
+                    it.copy(
+                        currentDb = db,
+                        todaySnoreMax = max(it.todaySnoreMax, db),
+                        todaySnoreMin = min(it.todaySnoreMin, db)
+                    )
+                }
             }
         }
         viewModelScope.launch {
             SnoreService.logFlow.collect { log ->
-                _state.update { it.copy(recentLogs = (listOf(log) + it.recentLogs).take(5)) }
+                _state.update { it.copy(recentLogs = (listOf(log) + it.recentLogs).take(7)) }
             }
         }
     }
@@ -47,8 +55,8 @@ class SleepViewModel @Inject constructor(
 
             is SnoreIntent.StopMonitoring -> {
                 context.stopService(Intent(context, SnoreService::class.java))
-                _state.update { it.copy(isMonitoring = false) }
-                saveSession()
+                _state.update { it.copy(isMonitoring = false, todaySnoreMax = 0) }
+                saveSession(intent.session)
             }
 
             is SnoreIntent.LoadHistory -> {
@@ -61,16 +69,9 @@ class SleepViewModel @Inject constructor(
         }
     }
 
-    private fun saveSession() {
+    private fun saveSession(session: SleepSession) {
         viewModelScope.launch {
-            dao.insertSession(
-                SleepSession(
-                    date = System.currentTimeMillis(),
-                    score = (70..95).random(),
-                    snoreMinutes = (10..60).random(),
-                    positionStatsJson = "등:80,옆:20"
-                )
-            )
+            dao.insertSession(session)
         }
     }
 }

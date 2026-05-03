@@ -36,7 +36,7 @@ fun MonitorScreen(state: SnoreState, onStopClicked: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background) // 시스템 배경색
+                .background(MaterialTheme.colorScheme.background)
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
