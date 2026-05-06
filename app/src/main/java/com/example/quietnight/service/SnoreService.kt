@@ -13,7 +13,6 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.widget.RemoteViews
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -35,7 +34,6 @@ import kotlin.math.sqrt
 
 @AndroidEntryPoint
 class SnoreService : LifecycleService() {
-    private val CHANNEL_ID = "QuietNightChannel"
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private lateinit var cachedBitmap: Bitmap
@@ -45,6 +43,7 @@ class SnoreService : LifecycleService() {
         val dbFlow = MutableStateFlow(0)
         val logFlow = MutableSharedFlow<String>()
         private const val NOTIFICATION_ID = 1004
+        private const val CHANNEL_ID = "QuietNightChannel"
     }
 
     override fun onCreate() {
@@ -92,12 +91,12 @@ class SnoreService : LifecycleService() {
 
         recordingJob = CoroutineScope(Dispatchers.IO).launch {
             val audioData = ShortArray(bufferSize)
-            launch {
-                dbFlow.collect { db ->
-                    updateNotification(db)
-                    delay(1000)
-                }
-            }
+//            launch {
+//                dbFlow.collect { db ->
+//                    updateNotification(db)
+//                    delay(1000)
+//                }
+//            }
 
             while (isActive) {
                 val readResult = audioRecord?.read(audioData, 0, bufferSize) ?: 0
@@ -105,7 +104,7 @@ class SnoreService : LifecycleService() {
                     val rms = sqrt(audioData.map { it.toDouble() * it }.average())
                     val db = (20 * log10(rms.coerceAtLeast(1.0))).toInt().coerceIn(0, 100)
                     dbFlow.emit(db)
-                    if (db > 75) {
+                    if (db > 65) {
                         (getSystemService(Vibrator::class.java)).vibrate(
                             VibrationEffect.createOneShot(
                                 300,
@@ -121,8 +120,8 @@ class SnoreService : LifecycleService() {
     }
 
     private fun createNotification(): Notification {
-        val notificationSmallLayout = RemoteViews(packageName, R.layout.notification_decibel)
-        val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel)
+//        val notificationSmallLayout = RemoteViews(packageName, R.layout.notification_decibel)
+//        val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel)
 
 
         val channel = NotificationChannel(CHANNEL_ID, "수면 관리", NotificationManager.IMPORTANCE_HIGH)
@@ -135,34 +134,34 @@ class SnoreService : LifecycleService() {
             .setContentIntent(openAppPendingIntent)
             .setLargeIcon(cachedBitmap)
             .setOnlyAlertOnce(true)
-            .setCustomContentView(notificationSmallLayout)
-            .setCustomBigContentView(notificationLayout)
+//            .setCustomContentView(notificationSmallLayout)
+//            .setCustomBigContentView(notificationLayout)
             .build()
     }
 
-    private fun updateNotification(decibel: Int) {
-        val notificationSmallLayout =
-            RemoteViews(packageName, R.layout.notification_decibel).apply {
-                setTextViewText(R.id.tv_decibel, decibel.toString())
-            }
-        val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel).apply {
-            setTextViewText(R.id.tv_decibel, decibel.toString())
-        }
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("QuietNight 작동 중")
-            .setSmallIcon(R.drawable.ic_stat_snore)
-            .setOngoing(true)
-            .setContentIntent(openAppPendingIntent)
-            .setLargeIcon(cachedBitmap)
-            .setOnlyAlertOnce(true)
-            .setCustomContentView(notificationSmallLayout)
-            .setCustomBigContentView(notificationLayout)
-            .build()
-
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, notification)
-    }
+//    private fun updateNotification(decibel: Int) {
+//        val notificationSmallLayout =
+//            RemoteViews(packageName, R.layout.notification_decibel).apply {
+//                setTextViewText(R.id.tv_decibel, decibel.toString())
+//            }
+//        val notificationLayout = RemoteViews(packageName, R.layout.notification_decibel).apply {
+//            setTextViewText(R.id.tv_decibel, decibel.toString())
+//        }
+//
+//        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+//            .setContentTitle("QuietNight 작동 중")
+//            .setSmallIcon(R.drawable.ic_stat_snore)
+//            .setOngoing(true)
+//            .setContentIntent(openAppPendingIntent)
+//            .setLargeIcon(cachedBitmap)
+//            .setOnlyAlertOnce(true)
+//            .setCustomContentView(notificationSmallLayout)
+//            .setCustomBigContentView(notificationLayout)
+//            .build()
+//
+//        val notificationManager = getSystemService(NotificationManager::class.java)
+//        notificationManager.notify(NOTIFICATION_ID, notification)
+//    }
 
     override fun onDestroy() {
         recordingJob?.cancel()
