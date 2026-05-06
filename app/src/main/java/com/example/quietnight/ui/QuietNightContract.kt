@@ -11,7 +11,7 @@ sealed class SnoreIntent {
 data class SnoreState(
     // Home State
     val todayScore: Int = 0,
-    val todaySnoreMin: Int = 0,
+    val todaySnoreTime: Int = 0,
     val todaySnoreMax: Int = 0,
     val positionStats: Map<String, Float> = emptyMap(),
 

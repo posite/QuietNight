@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.max
-import kotlin.math.min
 
 @HiltViewModel
 class SleepViewModel @Inject constructor(
@@ -34,14 +33,18 @@ class SleepViewModel @Inject constructor(
                     it.copy(
                         currentDb = db,
                         todaySnoreMax = max(it.todaySnoreMax, db),
-                        todaySnoreMin = min(it.todaySnoreMin, db)
                     )
                 }
             }
         }
         viewModelScope.launch {
             SnoreService.logFlow.collect { log ->
-                _state.update { it.copy(recentLogs = (listOf(log) + it.recentLogs).take(7)) }
+                _state.update {
+                    it.copy(
+                        recentLogs = (listOf(log) + it.recentLogs).take(7),
+                        todaySnoreTime = it.todaySnoreTime + 1
+                    )
+                }
             }
         }
     }
@@ -55,7 +58,13 @@ class SleepViewModel @Inject constructor(
 
             is SnoreIntent.StopMonitoring -> {
                 context.stopService(Intent(context, SnoreService::class.java))
-                _state.update { it.copy(isMonitoring = false, todaySnoreMax = 0) }
+                _state.update {
+                    it.copy(
+                        isMonitoring = false,
+                        todaySnoreMax = 0,
+                        todaySnoreTime = 0
+                    )
+                }
                 saveSession(intent.session)
             }
 

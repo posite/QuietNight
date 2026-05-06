@@ -150,7 +150,7 @@ fun QuietNightApp(viewModel: SleepViewModel) {
                         viewModel.handleIntent(
                             createSnoreSessionIntent(
                                 startTime,
-                                state.todaySnoreMax
+                                state.todaySnoreTime
                             )
                         )
                     } else {
@@ -211,13 +211,16 @@ fun QuietNightApp(viewModel: SleepViewModel) {
     }
 }
 
-private fun createSnoreSessionIntent(startTime: Long, score: Int): SnoreIntent.StopMonitoring {
+private fun createSnoreSessionIntent(startTime: Long, snoreTime: Int): SnoreIntent.StopMonitoring {
     val now = System.currentTimeMillis()
+    val sleepTime = now - startTime
+    val diff = sleepTime - snoreTime * 100
+    Log.d("log", "$sleepTime $snoreTime $diff")
     return SnoreIntent.StopMonitoring(
         SleepSession(
             date = now,
-            score = score,
-            snoreMinutes = ((now - startTime) / 1000 / 60).toInt(),
+            score = (diff.toDouble() / sleepTime * 100).toInt(),
+            snoreMinutes = sleepTime,
             positionStatsJson = "등:82,옆:18"
         )
     )
