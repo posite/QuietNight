@@ -36,6 +36,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -45,6 +48,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.quietnight.data.SleepSession
 import com.example.quietnight.ui.theme.QuietNightTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 
@@ -60,12 +64,17 @@ class MainActivity : ComponentActivity() {
             Log.d("grant", notGranted.toString())
         }
     }
+
     private val viewModel: SleepViewModel by viewModels<SleepViewModel>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkPermissions()
         viewModel.handleIntent(SnoreIntent.LoadHistory)
+        viewModel.handleIntent(SnoreIntent.TodayScore)
+        onEffect()
+
         var startTime = 0L
         setContent {
             QuietNightTheme {
@@ -74,13 +83,28 @@ class MainActivity : ComponentActivity() {
                     viewModel.handleIntent(
                         createSnoreSessionIntent(
                             startTime,
-                            state.todaySnoreTime
+                            state.snoreTime
                         )
                     )
                 }, onStartMonitoring = {
                     startTime = System.currentTimeMillis()
                     viewModel.handleIntent(SnoreIntent.StartMonitoring)
                 })
+            }
+        }
+    }
+
+    private fun onEffect() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.effect.collect {
+                    when (it) {
+                        is SnoreEffect.SessionSaved -> {
+                            Log.d("session", "saved")
+                            viewModel.handleIntent(SnoreIntent.TodayScore)
+                        }
+                    }
+                }
             }
         }
     }
@@ -229,7 +253,7 @@ private fun createSnoreSessionIntent(startTime: Long, snoreTime: Long): SnoreInt
         SleepSession(
             date = todayStartMillis,
             score = (diff.toDouble() / sleepTime * 100).toInt(),
-            snoreTime = snoreTime,
+            snoreTime = snoreTime * 100,
             sleepTime = sleepTime,
             positionStatsJson = "등:82,옆:18"
         )

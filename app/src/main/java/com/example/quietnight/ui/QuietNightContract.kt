@@ -6,6 +6,7 @@ sealed class SnoreIntent {
     data object StartMonitoring : SnoreIntent()
     data class StopMonitoring(val session: SleepSession) : SnoreIntent()
     data object LoadHistory : SnoreIntent()
+    data object TodayScore : SnoreIntent()
 }
 
 data class SnoreState(
@@ -13,6 +14,7 @@ data class SnoreState(
     val todayScore: Int = 0,
     val todaySnoreTime: Long = 0,
     val todaySnoreMax: Int = 0,
+    val snoreTime: Long = 0,
     val positionStats: Map<String, Float> = emptyMap(),
 
     // Monitor State
@@ -24,3 +26,7 @@ data class SnoreState(
     // Weekly State
     val weeklyHistory: List<SleepSession> = emptyList()
 )
+
+sealed class SnoreEffect {
+    data object SessionSaved : SnoreEffect()
+}

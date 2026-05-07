@@ -10,10 +10,14 @@ import com.example.quietnight.data.SnoreDao
 import com.example.quietnight.service.SnoreService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.math.max
 
@@ -25,6 +29,10 @@ class SleepViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(SnoreState())
     val state = _state.asStateFlow()
+
+    private val _effect: Channel<SnoreEffect> = Channel()
+    val effect = _effect.receiveAsFlow()
+
 
     init {
         // Service 데이터 구독
@@ -43,7 +51,7 @@ class SleepViewModel @Inject constructor(
                 _state.update {
                     it.copy(
                         recentLogs = (listOf(log) + it.recentLogs).take(7),
-                        todaySnoreTime = it.todaySnoreTime + 1
+                        snoreTime = it.snoreTime + 1
                     )
                 }
             }
@@ -64,9 +72,10 @@ class SleepViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             isMonitoring = false,
-                            todaySnoreTime = INIT_SNORE_VALUE
+                            snoreTime = INIT_SNORE_VALUE
                         )
                     }
+                    _effect.send(SnoreEffect.SessionSaved)
                 }
             }
 
@@ -74,6 +83,28 @@ class SleepViewModel @Inject constructor(
                 viewModelScope.launch {
                     dao.getHistory().collect { history ->
                         _state.update { it.copy(weeklyHistory = history) }
+                    }
+                }
+            }
+
+            is SnoreIntent.TodayScore -> {
+                viewModelScope.launch {
+                    val now = System.currentTimeMillis()
+                    val todayStartMillis = Instant.ofEpochMilli(now)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                        .atStartOfDay(ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli()
+                    val session = dao.getSessionByDate(todayStartMillis)
+                    Log.d("session", "$session")
+                    session?.let {
+                        _state.update {
+                            it.copy(
+                                todayScore = session.score,
+                                todaySnoreTime = session.snoreTime / 100
+                            )
+                        }
                     }
                 }
             }
