@@ -104,7 +104,7 @@ class SnoreService : LifecycleService() {
                     val rms = sqrt(audioData.map { it.toDouble() * it }.average())
                     val db = (20 * log10(rms.coerceAtLeast(1.0))).toInt().coerceIn(0, 100)
                     dbFlow.emit(db)
-                    if (db > 65) {
+                    if (db > 75) {
                         (getSystemService(Vibrator::class.java)).vibrate(
                             VibrationEffect.createOneShot(
                                 300,
