@@ -1,6 +1,7 @@
 package com.example.quietnight.ui
 
 import android.icu.util.Calendar
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import com.example.quietnight.ui.theme.QuietNightTheme
 
 @Composable
 fun WeeklyScreen(state: SnoreState) {
+    Log.d("sessions", state.weeklyHistory.toString())
     val history = fillMissingDays(state.weeklyHistory)
     QuietNightTheme {
         Column(
@@ -140,7 +142,8 @@ fun fillMissingDays(history: List<SleepSession>): List<SleepSession> {
             sessionOfDay ?: SleepSession(
                 date = targetCalendar.timeInMillis,
                 score = 0,
-                snoreMinutes = 0,
+                sleepTime = 0,
+                snoreTime = 0,
                 positionStatsJson = ""
             )
         )

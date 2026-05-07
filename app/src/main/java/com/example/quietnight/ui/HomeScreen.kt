@@ -46,7 +46,7 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 StatCard("수면 점수", "${state.todayScore}", "↑ 12점", Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(8.dp))
-                StatCard("코골이 시간", "${state.todaySnoreMin}분", "↓ 31%", Modifier.weight(1f))
+                StatCard("코골이 시간", "${state.todayScore}분", "↓ 31%", Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(24.dp))

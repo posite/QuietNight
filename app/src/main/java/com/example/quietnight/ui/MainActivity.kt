@@ -45,6 +45,8 @@ import androidx.navigation.compose.rememberNavController
 import com.example.quietnight.data.SleepSession
 import com.example.quietnight.ui.theme.QuietNightTheme
 import dagger.hilt.android.AndroidEntryPoint
+import java.time.Instant
+import java.time.ZoneId
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -64,9 +66,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         checkPermissions()
         viewModel.handleIntent(SnoreIntent.LoadHistory)
+        var startTime = 0L
         setContent {
             QuietNightTheme {
-                QuietNightApp(viewModel)
+                val state by viewModel.state.collectAsState()
+                QuietNightApp(state = state, onStopMonitoring = {
+                    viewModel.handleIntent(
+                        createSnoreSessionIntent(
+                            startTime,
+                            state.todaySnoreTime
+                        )
+                    )
+                }, onStartMonitoring = {
+                    startTime = System.currentTimeMillis()
+                    viewModel.handleIntent(SnoreIntent.StartMonitoring)
+                })
             }
         }
     }
@@ -123,12 +137,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun QuietNightApp(viewModel: SleepViewModel) {
+fun QuietNightApp(
+    state: SnoreState,
+    onStopMonitoring: () -> Unit,
+    onStartMonitoring: () -> Unit
+) {
     val navController = rememberNavController()
-    val state by viewModel.state.collectAsState()
     //val context = LocalContext.current
-
-    var startTime = 0L
 
     Box(
         modifier = Modifier
@@ -147,27 +162,14 @@ fun QuietNightApp(viewModel: SleepViewModel) {
             composable(Screen.Home.route) {
                 HomeScreen(state) {
                     if (state.isMonitoring) {
-                        viewModel.handleIntent(
-                            createSnoreSessionIntent(
-                                startTime,
-                                state.todaySnoreTime
-                            )
-                        )
+                        onStopMonitoring()
                     } else {
-                        startTime = System.currentTimeMillis()
-                        viewModel.handleIntent(SnoreIntent.StartMonitoring)
+                        onStartMonitoring()
                     }
                 }
             }
             composable(Screen.Monitor.route) {
-                MonitorScreen(state) {
-                    viewModel.handleIntent(
-                        createSnoreSessionIntent(
-                            startTime,
-                            state.todaySnoreMax
-                        )
-                    )
-                }
+                MonitorScreen(state) { onStopMonitoring() }
             }
             composable(Screen.Weekly.route) {
                 WeeklyScreen(state)
@@ -211,16 +213,24 @@ fun QuietNightApp(viewModel: SleepViewModel) {
     }
 }
 
-private fun createSnoreSessionIntent(startTime: Long, snoreTime: Int): SnoreIntent.StopMonitoring {
+private fun createSnoreSessionIntent(startTime: Long, snoreTime: Long): SnoreIntent.StopMonitoring {
     val now = System.currentTimeMillis()
+    val todayStartMillis = Instant.ofEpochMilli(now)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .atStartOfDay(ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+
     val sleepTime = now - startTime
     val diff = sleepTime - snoreTime * 100
     Log.d("log", "$sleepTime $snoreTime $diff")
     return SnoreIntent.StopMonitoring(
         SleepSession(
-            date = now,
+            date = todayStartMillis,
             score = (diff.toDouble() / sleepTime * 100).toInt(),
-            snoreMinutes = sleepTime,
+            snoreTime = snoreTime,
+            sleepTime = sleepTime,
             positionStatsJson = "등:82,옆:18"
         )
     )

@@ -2,6 +2,7 @@ package com.example.quietnight.ui
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.quietnight.data.SleepSession
@@ -58,14 +59,15 @@ class SleepViewModel @Inject constructor(
 
             is SnoreIntent.StopMonitoring -> {
                 context.stopService(Intent(context, SnoreService::class.java))
-                _state.update {
-                    it.copy(
-                        isMonitoring = false,
-                        todaySnoreMax = 0,
-                        todaySnoreTime = 0
-                    )
+                viewModelScope.launch {
+                    upsertSleepSession(intent)
+                    _state.update {
+                        it.copy(
+                            isMonitoring = false,
+                            todaySnoreTime = INIT_SNORE_VALUE
+                        )
+                    }
                 }
-                saveSession(intent.session)
             }
 
             is SnoreIntent.LoadHistory -> {
@@ -78,9 +80,31 @@ class SleepViewModel @Inject constructor(
         }
     }
 
-    private fun saveSession(session: SleepSession) {
-        viewModelScope.launch {
-            dao.insertSession(session)
+    private suspend fun upsertSleepSession(intent: SnoreIntent.StopMonitoring) {
+        val prevSession: SleepSession? = dao.getSessionByDate(intent.session.date)
+        if (prevSession != null) {
+            val totalTime = intent.session.sleepTime + prevSession.sleepTime
+            val totalSnoreTime = (intent.session.snoreTime + prevSession.snoreTime)
+            val totalScore = (totalTime - totalSnoreTime).toDouble() / totalTime * PERCENTAGE
+
+            Log.d(
+                "snore",
+                "${intent.session.sleepTime} ${intent.session.score} $totalTime $totalSnoreTime $totalScore"
+            )
+            dao.upsertSession(
+                prevSession.copy(
+                    score = totalScore.toInt(),
+                    sleepTime = totalTime,
+                    snoreTime = totalSnoreTime
+                )
+            )
+        } else {
+            dao.upsertSession(intent.session)
         }
+    }
+
+    companion object {
+        private const val INIT_SNORE_VALUE = 0L
+        private const val PERCENTAGE = 100
     }
 }

@@ -21,7 +21,7 @@ object DBModule {
             context,
             QuietNightDatabase::class.java,
             "quiet_night_database"
-        ).build()
+        ).fallbackToDestructiveMigration(true).build()
 
     @Singleton
     @Provides
