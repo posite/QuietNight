@@ -48,7 +48,7 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 StatCard(
                     "코골이 시간",
-                    "${state.todaySnoreTime.toDouble() / 100}분",
+                    "${state.todaySnoreTime.toDouble() / 10000}분",
                     "",
                     Modifier.weight(1f)
                 )

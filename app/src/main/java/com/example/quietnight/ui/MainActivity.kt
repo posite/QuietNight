@@ -83,7 +83,9 @@ class MainActivity : ComponentActivity() {
                     viewModel.handleIntent(
                         createSnoreSessionIntent(
                             startTime,
-                            state.snoreTime
+                            state.snoreTime,
+                            state.todaySnoreTime,
+                            state.todaySleepTime
                         )
                     )
                 }, onStartMonitoring = {
@@ -237,7 +239,12 @@ fun QuietNightApp(
     }
 }
 
-private fun createSnoreSessionIntent(startTime: Long, snoreTime: Long): SnoreIntent.StopMonitoring {
+private fun createSnoreSessionIntent(
+    startTime: Long,
+    snoreTime: Long,
+    todaySnoreTime: Long,
+    todaySleepTime: Long
+): SnoreIntent.StopMonitoring {
     val now = System.currentTimeMillis()
     val todayStartMillis = Instant.ofEpochMilli(now)
         .atZone(ZoneId.systemDefault())
@@ -246,14 +253,14 @@ private fun createSnoreSessionIntent(startTime: Long, snoreTime: Long): SnoreInt
         .toInstant()
         .toEpochMilli()
 
-    val sleepTime = now - startTime
-    val diff = sleepTime - snoreTime * 100
-    Log.d("log", "$sleepTime $snoreTime $diff")
+    val sleepTime = now - startTime + todaySleepTime
+    val diff = sleepTime - snoreTime * 100 - todaySnoreTime
+    Log.d("log", "$todaySleepTime $todaySnoreTime")
     return SnoreIntent.StopMonitoring(
         SleepSession(
             date = todayStartMillis,
             score = (diff.toDouble() / sleepTime * 100).toInt(),
-            snoreTime = snoreTime * 100,
+            snoreTime = snoreTime * 100 + todaySnoreTime,
             sleepTime = sleepTime,
             positionStatsJson = "등:82,옆:18"
         )

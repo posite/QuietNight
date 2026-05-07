@@ -68,6 +68,7 @@ class SleepViewModel @Inject constructor(
             is SnoreIntent.StopMonitoring -> {
                 context.stopService(Intent(context, SnoreService::class.java))
                 viewModelScope.launch {
+                    Log.d("save", intent.session.toString());
                     upsertSleepSession(intent)
                     _state.update {
                         it.copy(
@@ -102,7 +103,8 @@ class SleepViewModel @Inject constructor(
                         _state.update {
                             it.copy(
                                 todayScore = session.score,
-                                todaySnoreTime = session.snoreTime / 100
+                                todaySnoreTime = session.snoreTime,
+                                todaySleepTime = session.sleepTime
                             )
                         }
                     }
@@ -114,23 +116,15 @@ class SleepViewModel @Inject constructor(
     private suspend fun upsertSleepSession(intent: SnoreIntent.StopMonitoring) {
         val prevSession: SleepSession? = dao.getSessionByDate(intent.session.date)
         if (prevSession != null) {
-            val totalTime = intent.session.sleepTime + prevSession.sleepTime
-            val totalSnoreTime = (intent.session.snoreTime + prevSession.snoreTime)
-            val totalScore = (totalTime - totalSnoreTime).toDouble() / totalTime * PERCENTAGE
-
-            Log.d(
-                "snore",
-                "${intent.session.sleepTime} ${intent.session.score} $totalTime $totalSnoreTime $totalScore"
-            )
-            dao.upsertSession(
+            dao.updateSession(
                 prevSession.copy(
-                    score = totalScore.toInt(),
-                    sleepTime = totalTime,
-                    snoreTime = totalSnoreTime
+                    score = intent.session.score,
+                    sleepTime = intent.session.sleepTime,
+                    snoreTime = intent.session.snoreTime
                 )
             )
         } else {
-            dao.upsertSession(intent.session)
+            dao.insertSession(intent.session)
         }
     }
 
