@@ -15,6 +15,8 @@ data class SnoreState(
     val todaySnoreTime: Long = 0,
     val todaySnoreMax: Int = 0,
     val todaySleepTime: Long = 0,
+    val prevScore: Int = 0,
+    val prevSnoreTime: Long = 0,
     val snoreTime: Long = 0,
     val positionStats: Map<String, Float> = emptyMap(),
 

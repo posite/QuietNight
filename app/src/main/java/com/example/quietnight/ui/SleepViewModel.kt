@@ -104,7 +104,9 @@ class SleepViewModel @Inject constructor(
                             it.copy(
                                 todayScore = session.score,
                                 todaySnoreTime = session.snoreTime,
-                                todaySleepTime = session.sleepTime
+                                todaySleepTime = session.sleepTime,
+                                prevScore = state.value.todayScore,
+                                prevSnoreTime = state.value.todaySnoreTime
                             )
                         }
                     }

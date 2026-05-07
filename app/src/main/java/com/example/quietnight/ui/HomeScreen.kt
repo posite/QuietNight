@@ -1,5 +1,6 @@
 package com.example.quietnight.ui
 
+import android.icu.text.DecimalFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,12 +45,39 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
 
             // 2x2 통계 그리드
             Row(modifier = Modifier.fillMaxWidth()) {
-                StatCard("수면 점수", "${state.todayScore}", "", Modifier.weight(1f))
+                var snoreDiff = 0.0
+                var scoreDiff = 0.0
+                var scoreDiffStr = ""
+                var snoreDiffStr = ""
+                if (state.prevScore != 0) {
+                    scoreDiff =
+                        (state.todayScore - state.prevScore).toDouble() / state.prevScore * 100
+
+                    snoreDiff =
+                        (state.todaySnoreTime - state.prevSnoreTime).toDouble() / state.prevSnoreTime * 100
+                    scoreDiffStr = if (scoreDiff > 0) {
+                        "↑ ${DecimalFormat("#.##").format(scoreDiff)}%"
+                    } else if (scoreDiff < 0) {
+                        "↓ ${DecimalFormat("#.##").format(scoreDiff)}%"
+                    } else {
+                        ""
+                    }
+
+                    snoreDiffStr = if (snoreDiff > 0) {
+                        "↑ ${DecimalFormat("#.##").format(snoreDiff)}%"
+                    } else if (snoreDiff < 0) {
+                        "↓ ${DecimalFormat("#.##").format(snoreDiff)}%"
+                    } else {
+                        ""
+                    }
+                }
+
+                StatCard("수면 점수", "${state.todayScore}", scoreDiffStr, Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(8.dp))
                 StatCard(
                     "코골이 시간",
                     "${state.todaySnoreTime.toDouble() / 10000}분",
-                    "",
+                    snoreDiffStr,
                     Modifier.weight(1f)
                 )
             }
@@ -113,3 +141,5 @@ fun StatCard(label: String, value: String, badge: String, modifier: Modifier) {
         }
     }
 }
+
+val percentFormatter = DecimalFormat("#.##")
