@@ -58,7 +58,7 @@ class SleepViewModel @Inject constructor(
         }
     }
 
-    fun handleIntent(intent: SnoreIntent) {
+    private fun handleIntent(intent: SnoreIntent) {
         when (intent) {
             is SnoreIntent.StartMonitoring -> {
                 context.startForegroundService(Intent(context, SnoreService::class.java))
@@ -105,14 +105,31 @@ class SleepViewModel @Inject constructor(
                                 todayScore = session.score,
                                 todaySnoreTime = session.snoreTime,
                                 todaySleepTime = session.sleepTime,
-                                prevScore = state.value.todayScore,
-                                prevSnoreTime = state.value.todaySnoreTime
+                                prevScore = it.todayScore,
+                                prevSnoreTime = it.todaySnoreTime
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    fun loadSessionHistory() {
+        handleIntent(SnoreIntent.LoadHistory)
+    }
+
+    fun updateTodayScore() {
+        handleIntent(SnoreIntent.TodayScore)
+    }
+
+    fun stopMonitoring(session: SleepSession) {
+        handleIntent(SnoreIntent.StopMonitoring(session))
+    }
+
+
+    fun startMonitoring() {
+        handleIntent(SnoreIntent.StartMonitoring)
     }
 
     private suspend fun upsertSleepSession(intent: SnoreIntent.StopMonitoring) {
@@ -132,6 +149,5 @@ class SleepViewModel @Inject constructor(
 
     companion object {
         private const val INIT_SNORE_VALUE = 0L
-        private const val PERCENTAGE = 100
     }
 }

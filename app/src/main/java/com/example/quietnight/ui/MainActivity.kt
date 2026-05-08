@@ -71,8 +71,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkPermissions()
-        viewModel.handleIntent(SnoreIntent.LoadHistory)
-        viewModel.handleIntent(SnoreIntent.TodayScore)
+        viewModel.loadSessionHistory()
+        viewModel.updateTodayScore()
         onEffect()
 
         var startTime = 0L
@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
             QuietNightTheme {
                 val state by viewModel.state.collectAsState()
                 QuietNightApp(state = state, onStopMonitoring = {
-                    viewModel.handleIntent(
+                    viewModel.stopMonitoring(
                         createSnoreSessionIntent(
                             startTime,
                             state.snoreTime,
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }, onStartMonitoring = {
                     startTime = System.currentTimeMillis()
-                    viewModel.handleIntent(SnoreIntent.StartMonitoring)
+                    viewModel.startMonitoring()
                 })
             }
         }
@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
                     when (it) {
                         is SnoreEffect.SessionSaved -> {
                             Log.d("session", "saved")
-                            viewModel.handleIntent(SnoreIntent.TodayScore)
+                            viewModel.updateTodayScore()
                         }
                     }
                 }
@@ -244,7 +244,7 @@ private fun createSnoreSessionIntent(
     snoreTime: Long,
     todaySnoreTime: Long,
     todaySleepTime: Long
-): SnoreIntent.StopMonitoring {
+): SleepSession {
     val now = System.currentTimeMillis()
     val todayStartMillis = Instant.ofEpochMilli(now)
         .atZone(ZoneId.systemDefault())
@@ -256,14 +256,12 @@ private fun createSnoreSessionIntent(
     val sleepTime = now - startTime + todaySleepTime
     val diff = sleepTime - snoreTime * 100 - todaySnoreTime
     Log.d("log", "$todaySleepTime $todaySnoreTime")
-    return SnoreIntent.StopMonitoring(
-        SleepSession(
-            date = todayStartMillis,
-            score = (diff.toDouble() / sleepTime * 100).toInt(),
-            snoreTime = snoreTime * 100 + todaySnoreTime,
-            sleepTime = sleepTime,
-            positionStatsJson = "등:82,옆:18"
-        )
+    return SleepSession(
+        date = todayStartMillis,
+        score = (diff.toDouble() / sleepTime * 100).toInt(),
+        snoreTime = snoreTime * 100 + todaySnoreTime,
+        sleepTime = sleepTime,
+        positionStatsJson = "등:82,옆:18"
     )
 }
 
