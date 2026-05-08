@@ -49,6 +49,9 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
                 var scoreDiff = 0.0
                 var scoreDiffStr = ""
                 var snoreDiffStr = ""
+                var scoreDiffColor = Color.Black
+                var snoreDiffColor = Color.Black
+
                 if (state.prevScore != 0) {
                     scoreDiff =
                         (state.todayScore - state.prevScore).toDouble() / state.prevScore * 100
@@ -62,6 +65,7 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
                     } else {
                         ""
                     }
+                    scoreDiffColor = if (scoreDiff > 0) Color(0xFF4ADE80) else Color.Red
 
                     snoreDiffStr = if (snoreDiff > 0) {
                         "↑ ${DecimalFormat("#.##").format(snoreDiff)}%"
@@ -70,14 +74,22 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
                     } else {
                         ""
                     }
+                    snoreDiffColor = if (snoreDiff > 0) Color.Red else Color(0xFF4ADE80)
                 }
 
-                StatCard("수면 점수", "${state.todayScore}", scoreDiffStr, Modifier.weight(1f))
+                StatCard(
+                    "수면 점수",
+                    "${state.todayScore}",
+                    scoreDiffStr,
+                    scoreDiffColor,
+                    Modifier.weight(1f)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 StatCard(
                     "코골이 시간",
                     "${state.todaySnoreTime.toDouble() / 10000}분",
                     snoreDiffStr,
+                    snoreDiffColor,
                     Modifier.weight(1f)
                 )
             }
@@ -123,7 +135,7 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
 }
 
 @Composable
-fun StatCard(label: String, value: String, badge: String, modifier: Modifier) {
+fun StatCard(label: String, value: String, badge: String, diffColor: Color, modifier: Modifier) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -137,7 +149,7 @@ fun StatCard(label: String, value: String, badge: String, modifier: Modifier) {
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
-            Text(badge, color = Color(0xFF4ADE80), fontSize = 10.sp)
+            Text(badge, color = diffColor, fontSize = 10.sp)
         }
     }
 }
