@@ -2,56 +2,81 @@ package com.example.quietnight.ui
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.quietnight.data.SleepSession
+import com.example.quietnight.data.SettingsRepository
 import com.example.quietnight.data.SnoreDao
 import com.example.quietnight.service.SnoreService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
-import kotlin.math.max
+import java.util.Locale
 
 @HiltViewModel
 class SleepViewModel @Inject constructor(
     private val dao: SnoreDao,
+    private val settings: SettingsRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SnoreState())
     val state = _state.asStateFlow()
 
-    private val _effect: Channel<SnoreEffect> = Channel()
-    val effect = _effect.receiveAsFlow()
-
-
     init {
-        // Service 데이터 구독
+        // 서비스 실시간 데시벨
         viewModelScope.launch {
-            SnoreService.dbFlow.collect { db ->
-                _state.update {
-                    it.copy(
-                        currentDb = db,
-                        todaySnoreMax = max(it.todaySnoreMax, db),
-                    )
+            SnoreService.dbFlow.collect { db -> _state.update { it.copy(currentDb = db) } }
+        }
+        // 서비스 감지 로그
+        viewModelScope.launch {
+            SnoreService.logFlow.collect { log ->
+                _state.update { it.copy(recentLogs = (listOf(log) + it.recentLogs).take(7)) }
+            }
+        }
+        // 측정 중 여부 (프로세스가 죽었다 살아나도 서비스가 재설정)
+        viewModelScope.launch {
+            SnoreService.monitoringFlow.collect { running ->
+                _state.update { it.copy(isMonitoring = running) }
+            }
+        }
+        // 경과 시간 타이머
+        viewModelScope.launch {
+            SnoreService.monitoringFlow.collectLatest { running ->
+                if (running) {
+                    while (true) {
+                        val start = SnoreService.startTimeFlow.value
+                        val elapsed = if (start > 0) System.currentTimeMillis() - start else 0
+                        _state.update { it.copy(elapsedTime = formatElapsed(elapsed)) }
+                        delay(1000)
+                    }
+                } else {
+                    _state.update { it.copy(elapsedTime = "00:00:00") }
                 }
             }
         }
+        // 감지 민감도(임계값) 설정
         viewModelScope.launch {
-            SnoreService.logFlow.collect { log ->
+            settings.settings.collect { s -> _state.update { it.copy(threshold = s.threshold) } }
+        }
+        // 오늘 세션(실시간) + 어제 세션(증감 비교)
+        viewModelScope.launch {
+            val yesterday = dao.getSessionByDate(startOfDayMillis(-1))
+            dao.getSessionByDateFlow(startOfDayMillis(0)).collect { today ->
                 _state.update {
                     it.copy(
-                        recentLogs = (listOf(log) + it.recentLogs).take(7),
-                        snoreTime = it.snoreTime + 1
+                        todayScore = today?.score ?: 0,
+                        todaySnoreTime = today?.snoreTime ?: 0L,
+                        todaySleepTime = today?.sleepTime ?: 0L,
+                        prevScore = yesterday?.score ?: 0,
+                        prevSnoreTime = yesterday?.snoreTime ?: 0L
                     )
                 }
             }
@@ -67,17 +92,7 @@ class SleepViewModel @Inject constructor(
 
             is SnoreIntent.StopMonitoring -> {
                 context.stopService(Intent(context, SnoreService::class.java))
-                viewModelScope.launch {
-                    Log.d("save", intent.session.toString());
-                    upsertSleepSession(intent)
-                    _state.update {
-                        it.copy(
-                            isMonitoring = false,
-                            snoreTime = INIT_SNORE_VALUE
-                        )
-                    }
-                    _effect.send(SnoreEffect.SessionSaved)
-                }
+                _state.update { it.copy(isMonitoring = false) }
             }
 
             is SnoreIntent.LoadHistory -> {
@@ -87,67 +102,29 @@ class SleepViewModel @Inject constructor(
                     }
                 }
             }
-
-            is SnoreIntent.TodayScore -> {
-                viewModelScope.launch {
-                    val now = System.currentTimeMillis()
-                    val todayStartMillis = Instant.ofEpochMilli(now)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate()
-                        .atStartOfDay(ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
-                    val session = dao.getSessionByDate(todayStartMillis)
-                    Log.d("session", "$session")
-                    session?.let {
-                        _state.update {
-                            it.copy(
-                                todayScore = session.score,
-                                todaySnoreTime = session.snoreTime,
-                                todaySleepTime = session.sleepTime,
-                                prevScore = it.todayScore,
-                                prevSnoreTime = it.todaySnoreTime
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 
-    fun loadSessionHistory() {
-        handleIntent(SnoreIntent.LoadHistory)
-    }
+    fun startMonitoring() = handleIntent(SnoreIntent.StartMonitoring)
 
-    fun updateTodayScore() {
-        handleIntent(SnoreIntent.TodayScore)
-    }
+    fun stopMonitoring() = handleIntent(SnoreIntent.StopMonitoring)
 
-    fun stopMonitoring(session: SleepSession) {
-        handleIntent(SnoreIntent.StopMonitoring(session))
-    }
+    fun loadSessionHistory() = handleIntent(SnoreIntent.LoadHistory)
 
+    private fun startOfDayMillis(offsetDays: Long): Long =
+        Instant.ofEpochMilli(System.currentTimeMillis())
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .plusDays(offsetDays)
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
 
-    fun startMonitoring() {
-        handleIntent(SnoreIntent.StartMonitoring)
-    }
-
-    private suspend fun upsertSleepSession(intent: SnoreIntent.StopMonitoring) {
-        val prevSession: SleepSession? = dao.getSessionByDate(intent.session.date)
-        if (prevSession != null) {
-            dao.updateSession(
-                prevSession.copy(
-                    score = intent.session.score,
-                    sleepTime = intent.session.sleepTime,
-                    snoreTime = intent.session.snoreTime
-                )
-            )
-        } else {
-            dao.insertSession(intent.session)
-        }
-    }
-
-    companion object {
-        private const val INIT_SNORE_VALUE = 0L
+    private fun formatElapsed(ms: Long): String {
+        val totalSec = ms / 1000
+        val h = totalSec / 3600
+        val m = (totalSec % 3600) / 60
+        val s = totalSec % 60
+        return String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
     }
 }

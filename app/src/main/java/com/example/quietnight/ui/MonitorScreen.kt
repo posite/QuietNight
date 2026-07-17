@@ -47,14 +47,24 @@ fun MonitorScreen(state: SnoreState, onStopClicked: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 경과 시간 타이머
+            Text(
+                text = state.elapsedTime,
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // 실시간 데시벨 인디케이터
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) {
                 CircularProgressIndicator(
                     progress = { state.currentDb / 100f },
                     modifier = Modifier.fillMaxSize(),
-                    color = if (state.currentDb > 75) Color.Red else MaterialTheme.colorScheme.primary,
+                    color = if (state.currentDb > state.threshold) Color.Red else MaterialTheme.colorScheme.primary,
                     strokeWidth = 12.dp,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     strokeCap = ProgressIndicatorDefaults.CircularDeterminateStrokeCap,

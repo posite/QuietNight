@@ -1,9 +1,12 @@
 package com.example.quietnight.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,12 +26,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,84 +43,99 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.quietnight.data.SleepSession
+import com.example.quietnight.data.AppSettings
 import com.example.quietnight.ui.theme.QuietNightTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.ZoneId
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val permissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val notGranted = permissions.keys.filter { !permissions[it]!! }
-        if (notGranted.isEmpty()) {
-            Log.d("Main", "All granted!!")
-        } else {
-            Log.d("grant", notGranted.toString())
-        }
+    ) {
+        // 핵심 권한(마이크) 여부로 안내 다이얼로그 표시 결정
+        showMicDialog = !isRecordAudioGranted()
     }
 
     private val viewModel: SleepViewModel by viewModels<SleepViewModel>()
+    private val settingsViewModel: SettingsViewModel by viewModels<SettingsViewModel>()
+
+    // 마이크 권한 거부 시 노출되는 안내 다이얼로그
+    private var showMicDialog by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkPermissions()
         viewModel.loadSessionHistory()
-        viewModel.updateTodayScore()
-        onEffect()
 
-        var startTime = 0L
         setContent {
             QuietNightTheme {
                 val state by viewModel.state.collectAsState()
-                QuietNightApp(state = state, onStopMonitoring = {
-                    viewModel.stopMonitoring(
-                        createSnoreSessionIntent(
-                            startTime,
-                            state.snoreTime,
-                            state.todaySnoreTime,
-                            state.todaySleepTime
-                        )
-                    )
-                }, onStartMonitoring = {
-                    startTime = System.currentTimeMillis()
-                    viewModel.startMonitoring()
-                })
-            }
-        }
-    }
+                val settings by settingsViewModel.settings.collectAsState()
 
-    private fun onEffect() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.effect.collect {
-                    when (it) {
-                        is SnoreEffect.SessionSaved -> {
-                            Log.d("session", "saved")
-                            viewModel.updateTodayScore()
+                QuietNightApp(
+                    state = state,
+                    settings = settings,
+                    onStartMonitoring = { viewModel.startMonitoring() },
+                    onStopMonitoring = { viewModel.stopMonitoring() },
+                    onThresholdChange = { settingsViewModel.setThreshold(it) },
+                    onVibrationToggle = { settingsViewModel.setVibrationEnabled(it) },
+                    onVibrationStrengthChange = { settingsViewModel.setVibrationStrength(it) }
+                )
+
+                if (showMicDialog) {
+                    AlertDialog(
+                        onDismissRequest = { },
+                        title = { Text("마이크 권한 필요") },
+                        text = { Text("코골이 감지를 위해 마이크 권한이 필요합니다. 권한을 허용하거나 앱을 종료해 주세요.") },
+                        confirmButton = {
+                            TextButton(onClick = { requestMic() }) { Text("권한 허용") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { finish() }) { Text("앱 종료") }
                         }
-                    }
+                    )
                 }
             }
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 설정에서 권한을 허용하고 돌아온 경우 다이얼로그 닫기
+        if (isRecordAudioGranted()) showMicDialog = false
+    }
+
+    private fun isRecordAudioGranted(): Boolean =
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+    private fun requestMic() {
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO)) {
+            permissionsLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+        } else {
+            // 영구 거부(다시 묻지 않음) → 앱 설정 화면으로 이동
+            startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", packageName, null)
+                )
+            )
+        }
+    }
+
     private fun checkPermissions() {
         val permissionsToRequest = mutableListOf<String>()
-        if (ActivityCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
@@ -123,7 +145,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (ActivityCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.VIBRATE
             ) != PackageManager.PERMISSION_GRANTED
@@ -131,7 +153,7 @@ class MainActivity : ComponentActivity() {
             permissionsToRequest.add(Manifest.permission.VIBRATE)
         }
 
-        if (ActivityCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.FOREGROUND_SERVICE
             ) != PackageManager.PERMISSION_GRANTED
@@ -139,7 +161,7 @@ class MainActivity : ComponentActivity() {
             permissionsToRequest.add(Manifest.permission.FOREGROUND_SERVICE)
         }
 
-        if (ActivityCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.FOREGROUND_SERVICE_MICROPHONE
             ) != PackageManager.PERMISSION_GRANTED
@@ -148,7 +170,7 @@ class MainActivity : ComponentActivity() {
                 permissionsToRequest.add(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
             }
         }
-        if (ActivityCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
@@ -158,6 +180,8 @@ class MainActivity : ComponentActivity() {
 
         if (permissionsToRequest.isNotEmpty()) {
             permissionsLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            Log.d("Main", "All granted!!")
         }
     }
 }
@@ -165,16 +189,19 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun QuietNightApp(
     state: SnoreState,
+    settings: AppSettings,
+    onStartMonitoring: () -> Unit,
     onStopMonitoring: () -> Unit,
-    onStartMonitoring: () -> Unit
+    onThresholdChange: (Int) -> Unit,
+    onVibrationToggle: (Boolean) -> Unit,
+    onVibrationStrengthChange: (Int) -> Unit
 ) {
     val navController = rememberNavController()
-    //val context = LocalContext.current
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 12.dp)
+            .padding(top = 24.dp)
     ) {
 
         NavHost(
@@ -186,19 +213,27 @@ fun QuietNightApp(
         ) {
 
             composable(Screen.Home.route) {
-                HomeScreen(state) {
-                    if (state.isMonitoring) {
-                        onStopMonitoring()
-                    } else {
-                        onStartMonitoring()
-                    }
+                HomeScreen(
+                    state = state,
+                    onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                ) {
+                    if (state.isMonitoring) onStopMonitoring() else onStartMonitoring()
                 }
             }
             composable(Screen.Monitor.route) {
                 MonitorScreen(state) { onStopMonitoring() }
             }
-            composable(Screen.Weekly.route) {
-                WeeklyScreen(state)
+            composable(Screen.Analyze.route) {
+                AnalyzeScreen(state)
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    settings = settings,
+                    onThresholdChange = onThresholdChange,
+                    onVibrationToggle = onVibrationToggle,
+                    onVibrationStrengthChange = onVibrationStrengthChange,
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
 
@@ -215,7 +250,6 @@ fun QuietNightApp(
                     color = MaterialTheme.colorScheme.primary,
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                 ),
-            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             BOTTOM_SCREENS.forEach { screen ->
@@ -224,6 +258,7 @@ fun QuietNightApp(
                 BottomNavItem(
                     screen = screen,
                     selected = selected,
+                    modifier = Modifier.weight(1f),
                     onClick = {
                         navController.navigate(screen.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
@@ -239,44 +274,19 @@ fun QuietNightApp(
     }
 }
 
-private fun createSnoreSessionIntent(
-    startTime: Long,
-    snoreTime: Long,
-    todaySnoreTime: Long,
-    todaySleepTime: Long
-): SleepSession {
-    val now = System.currentTimeMillis()
-    val todayStartMillis = Instant.ofEpochMilli(now)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-        .atStartOfDay(ZoneId.systemDefault())
-        .toInstant()
-        .toEpochMilli()
-
-    val sleepTime = now - startTime + todaySleepTime
-    val diff = sleepTime - snoreTime * 100 - todaySnoreTime
-    Log.d("log", "$todaySleepTime $todaySnoreTime")
-    return SleepSession(
-        date = todayStartMillis,
-        score = (diff.toDouble() / sleepTime * 100).toInt(),
-        snoreTime = snoreTime * 100 + todaySnoreTime,
-        sleepTime = sleepTime,
-        positionStatsJson = "등:82,옆:18"
-    )
-}
-
 @Composable
 private fun BottomNavItem(
     screen: Screen,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(vertical = 8.dp)
     ) {
         Icon(
             imageVector = screen.icon,

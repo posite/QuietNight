@@ -42,6 +42,11 @@ android {
     }
 }
 
+// Room 스키마를 export 해서 마이그레이션 검증/작성 근거로 사용
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

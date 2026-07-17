@@ -19,6 +19,9 @@ interface SnoreDao {
     @Query("SELECT * FROM sleep_sessions WHERE date = :date")
     suspend fun getSessionByDate(date: Long): SleepSession?
 
+    @Query("SELECT * FROM sleep_sessions WHERE date = :date")
+    fun getSessionByDateFlow(date: Long): Flow<SleepSession?>
+
 
     @Query("SELECT * FROM sleep_sessions ORDER BY date DESC")
     fun getHistory(): Flow<List<SleepSession>>

@@ -9,7 +9,7 @@ data class SleepSession(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: Long,
     val score: Int,
-    val snoreTime: Long,
-    val sleepTime: Long,
-    val positionStatsJson: String // "등:82,옆:18" 형태의 JSON 저장
+    val snoreTime: Long,           // 밀리초
+    val sleepTime: Long,           // 밀리초
+    val timelineCsv: String = ""   // 1분 단위 dB 샘플의 CSV ("12,15,40,...")
 )

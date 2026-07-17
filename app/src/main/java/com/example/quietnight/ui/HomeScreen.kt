@@ -2,6 +2,7 @@ package com.example.quietnight.ui
 
 import android.icu.text.DecimalFormat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,13 +12,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -26,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.example.quietnight.ui.theme.QuietNightTheme
 
 @Composable
-fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
+fun HomeScreen(state: SnoreState, onOpenSettings: () -> Unit, onMonitorClicked: () -> Unit) {
     QuietNightTheme {
         Column(
             modifier = Modifier
@@ -34,12 +40,25 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
                 .background(MaterialTheme.colorScheme.background) // 시스템 배경색 대응
                 .padding(16.dp)
         ) {
-            Text(
-                text = "수면 리포트",
-                color = MaterialTheme.colorScheme.onBackground, // 시스템 텍스트색 대응
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "수면 리포트",
+                    color = MaterialTheme.colorScheme.onBackground, // 시스템 텍스트색 대응
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = "설정",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -87,7 +106,7 @@ fun HomeScreen(state: SnoreState, onMonitorClicked: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 StatCard(
                     "코골이 시간",
-                    "${state.todaySnoreTime.toDouble() / 10000}분",
+                    "${DecimalFormat("#.#").format(state.todaySnoreTime.toDouble() / 60000)}분",
                     snoreDiffStr,
                     snoreDiffColor,
                     Modifier.weight(1f)
