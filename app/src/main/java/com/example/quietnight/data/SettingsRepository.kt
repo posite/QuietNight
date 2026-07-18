@@ -10,11 +10,13 @@ import javax.inject.Singleton
 
 // 사용자 설정.
 // threshold = 코골이 감지 데시벨 기준, vibrationEnabled = 진동 교정 사용 여부,
-// vibrationStrength = 진동 세기(VibrationEffect amplitude, 1~255)
+// vibrationStrength = 진동 세기(VibrationEffect amplitude, 1~255),
+// recordClips = 코골이 소리 클립 녹음 여부(프라이버시상 기본 OFF)
 data class AppSettings(
     val threshold: Int = 75,
     val vibrationEnabled: Boolean = true,
-    val vibrationStrength: Int = 150
+    val vibrationStrength: Int = 150,
+    val recordClips: Boolean = false
 )
 
 @Singleton
@@ -29,7 +31,8 @@ class SettingsRepository @Inject constructor(
     private fun load() = AppSettings(
         threshold = prefs.getInt(KEY_THRESHOLD, DEFAULT_THRESHOLD),
         vibrationEnabled = prefs.getBoolean(KEY_VIBRATION, true),
-        vibrationStrength = prefs.getInt(KEY_STRENGTH, DEFAULT_STRENGTH)
+        vibrationStrength = prefs.getInt(KEY_STRENGTH, DEFAULT_STRENGTH),
+        recordClips = prefs.getBoolean(KEY_RECORD_CLIPS, false)
     )
 
     fun setThreshold(value: Int) {
@@ -48,11 +51,17 @@ class SettingsRepository @Inject constructor(
         _settings.value = _settings.value.copy(vibrationStrength = clamped)
     }
 
+    fun setRecordClips(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_RECORD_CLIPS, enabled).apply()
+        _settings.value = _settings.value.copy(recordClips = enabled)
+    }
+
     companion object {
         const val DEFAULT_THRESHOLD = 75
         const val DEFAULT_STRENGTH = 150
         private const val KEY_THRESHOLD = "threshold"
         private const val KEY_VIBRATION = "vibration"
         private const val KEY_STRENGTH = "vibration_strength"
+        private const val KEY_RECORD_CLIPS = "record_clips"
     }
 }

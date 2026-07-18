@@ -6,6 +6,7 @@ sealed class SnoreIntent {
     data object StartMonitoring : SnoreIntent()
     data object StopMonitoring : SnoreIntent()
     data object LoadHistory : SnoreIntent()
+    data object ClearHistory : SnoreIntent()
 }
 
 data class SnoreState(
@@ -24,5 +25,5 @@ data class SnoreState(
     val recentLogs: List<String> = emptyList(),
 
     // Analyze State
-    val weeklyHistory: List<SleepSession> = emptyList()
+    val sessionHistory: List<SleepSession> = emptyList()
 )

@@ -19,4 +19,6 @@ class SettingsViewModel @Inject constructor(
     fun setVibrationEnabled(enabled: Boolean) = repository.setVibrationEnabled(enabled)
 
     fun setVibrationStrength(value: Int) = repository.setVibrationStrength(value)
+
+    fun setRecordClips(enabled: Boolean) = repository.setRecordClips(enabled)
 }

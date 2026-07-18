@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.quietnight.data.SleepSession
+import com.example.quietnight.data.SnoreClip
 import com.example.quietnight.ui.theme.QuietNightTheme
 
 // 차트 집계 기간
@@ -40,22 +41,27 @@ enum class ChartPeriod(val label: String) {
     DAILY("일간"), WEEKLY("주간"), MONTHLY("월간")
 }
 
-// 막대 하나에 대응하는 데이터. hasData=false 면 기록이 없는 더미 막대(회색)
-// session != null 인 경우(일간) 탭하면 상세 보기를 연다.
+// 막대 하나에 대응하는 데이터. hasData=false 면 기록이 없는 더미 막대(회색).
+// sessions 에는 해당 버킷의 세션이 담긴다(일간=0~1개, 주간/월간=구간 내 전체).
 data class ChartBar(
     val label: String,
     val score: Int,
     val hasData: Boolean,
-    val session: SleepSession? = null
+    val sessions: List<SleepSession> = emptyList(),
+    val rangeLabel: String = ""
 )
 
 @Composable
-fun AnalyzeScreen(state: SnoreState) {
+fun AnalyzeScreen(
+    state: SnoreState,
+    clipProvider: suspend (Long) -> List<SnoreClip> = { emptyList() }
+) {
     var period by rememberSaveable { mutableStateOf(ChartPeriod.DAILY) }
-    var selected by remember { mutableStateOf<SleepSession?>(null) }
-    val bars = remember(state.weeklyHistory, period) {
-        buildChartBars(state.weeklyHistory, period)
+    var selected by remember { mutableStateOf<ChartBar?>(null) }
+    val bars = remember(state.sessionHistory, period) {
+        buildChartBars(state.sessionHistory, period)
     }
+    val hasAnyData = bars.any { it.hasData }
 
     QuietNightTheme {
         Column(
@@ -65,7 +71,7 @@ fun AnalyzeScreen(state: SnoreState) {
                 .padding(16.dp)
         ) {
             Text(
-                text = "코골이 점수 비교",
+                text = "수면 점수 비교",
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
@@ -77,13 +83,13 @@ fun AnalyzeScreen(state: SnoreState) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            ScoreBarChart(bars = bars, onBarClick = { selected = it })
+            ScoreBarChart(bars = bars, hasAnyData = hasAnyData, onBarClick = { selected = it })
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (period == ChartPeriod.DAILY) {
+            if (hasAnyData) {
                 Text(
-                    text = "막대를 누르면 그날의 상세 기록을 볼 수 있어요.",
+                    text = "막대를 누르면 상세 기록을 볼 수 있어요.",
                     color = MaterialTheme.colorScheme.outline,
                     fontSize = 12.sp
                 )
@@ -91,8 +97,20 @@ fun AnalyzeScreen(state: SnoreState) {
         }
     }
 
-    selected?.let { session ->
-        DayDetailDialog(session = session, onDismiss = { selected = null })
+    selected?.let { bar ->
+        if (bar.sessions.size == 1) {
+            DayDetailDialog(
+                session = bar.sessions.first(),
+                clipProvider = clipProvider,
+                onDismiss = { selected = null }
+            )
+        } else {
+            AggregateDetailDialog(
+                title = bar.rangeLabel.ifEmpty { bar.label },
+                sessions = bar.sessions,
+                onDismiss = { selected = null }
+            )
+        }
     }
 }
 
@@ -130,7 +148,11 @@ private fun PeriodSelector(selected: ChartPeriod, onSelect: (ChartPeriod) -> Uni
 }
 
 @Composable
-private fun ScoreBarChart(bars: List<ChartBar>, onBarClick: (SleepSession) -> Unit) {
+private fun ScoreBarChart(
+    bars: List<ChartBar>,
+    hasAnyData: Boolean,
+    onBarClick: (ChartBar) -> Unit
+) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
@@ -138,6 +160,16 @@ private fun ScoreBarChart(bars: List<ChartBar>, onBarClick: (SleepSession) -> Un
             .height(200.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
+        if (!hasAnyData) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "아직 기록이 없어요.\n오늘 밤 측정을 시작해 보세요.",
+                    color = MaterialTheme.colorScheme.outline,
+                    fontSize = 13.sp
+                )
+            }
+            return@Card
+        }
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -147,13 +179,12 @@ private fun ScoreBarChart(bars: List<ChartBar>, onBarClick: (SleepSession) -> Un
         ) {
             val max = bars.maxOf { it.score }.coerceAtLeast(1).toFloat()
             bars.forEach { bar ->
-                val session = bar.session
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = if (session != null) {
+                    modifier = if (bar.hasData) {
                         Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .clickable { onBarClick(session) }
+                            .clickable { onBarClick(bar) }
                     } else Modifier
                 ) {
                     Column(
@@ -165,16 +196,17 @@ private fun ScoreBarChart(bars: List<ChartBar>, onBarClick: (SleepSession) -> Un
                     ) {
                         Text(
                             text = bar.score.toString(),
-                            color = if (bar.hasData) MaterialTheme.colorScheme.onSurface
+                            color = if (bar.hasData) scoreColor(bar.score)
                             else MaterialTheme.colorScheme.outline,
-                            fontSize = 10.sp
+                            fontSize = 10.sp,
+                            fontWeight = if (bar.hasData) FontWeight.Bold else FontWeight.Normal
                         )
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight((bar.score / max).coerceAtLeast(0.02f))
                                 .background(
-                                    color = if (bar.hasData) MaterialTheme.colorScheme.primary
+                                    color = if (bar.hasData) scoreColor(bar.score)
                                     else MaterialTheme.colorScheme.outlineVariant,
                                     shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
                                 )
@@ -193,6 +225,13 @@ private fun ScoreBarChart(bars: List<ChartBar>, onBarClick: (SleepSession) -> Un
     }
 }
 
+// 점수대별 색상: 80↑ 초록 / 50~79 노랑 / 50↓ 빨강
+fun scoreColor(score: Int): Color = when {
+    score >= 80 -> Color(0xFF4ADE80)
+    score >= 50 -> Color(0xFFFBBF24)
+    else -> Color(0xFFEF4444)
+}
+
 // ── 집계 로직 ────────────────────────────────────────────────
 
 fun buildChartBars(history: List<SleepSession>, period: ChartPeriod): List<ChartBar> =
@@ -209,7 +248,7 @@ private fun buildDailyBars(history: List<SleepSession>): List<ChartBar> {
         val cal = midnightToday().apply { add(Calendar.DAY_OF_YEAR, -i) }
         val session = history.find { isSameDay(it.date, cal.timeInMillis) }
         val label = weekdayLabel(cal.get(Calendar.DAY_OF_WEEK))
-        bars.add(ChartBar(label, session?.score ?: 0, session != null, session))
+        bars.add(ChartBar(label, session?.score ?: 0, session != null, listOfNotNull(session)))
     }
     return bars
 }
@@ -223,7 +262,9 @@ private fun buildWeeklyBars(history: List<SleepSession>): List<ChartBar> {
         val end = (start.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 7) }
         val inRange = history.filter { it.date >= start.timeInMillis && it.date < end.timeInMillis }
         val label = "${start.get(Calendar.MONTH) + 1}/${start.get(Calendar.DAY_OF_MONTH)}"
-        bars.add(toAverageBar(label, inRange))
+        val last = (start.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 6) }
+        val rangeLabel = "$label ~ ${last.get(Calendar.MONTH) + 1}/${last.get(Calendar.DAY_OF_MONTH)} 주간"
+        bars.add(toAverageBar(label, inRange, rangeLabel))
     }
     return bars
 }
@@ -237,14 +278,15 @@ private fun buildMonthlyBars(history: List<SleepSession>): List<ChartBar> {
         val end = (start.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
         val inRange = history.filter { it.date >= start.timeInMillis && it.date < end.timeInMillis }
         val label = "${start.get(Calendar.MONTH) + 1}월"
-        bars.add(toAverageBar(label, inRange))
+        val rangeLabel = "${start.get(Calendar.YEAR)}년 $label"
+        bars.add(toAverageBar(label, inRange, rangeLabel))
     }
     return bars
 }
 
-private fun toAverageBar(label: String, sessions: List<SleepSession>): ChartBar =
+private fun toAverageBar(label: String, sessions: List<SleepSession>, rangeLabel: String): ChartBar =
     if (sessions.isEmpty()) ChartBar(label, 0, false)
-    else ChartBar(label, sessions.map { it.score }.average().toInt(), true)
+    else ChartBar(label, sessions.map { it.score }.average().toInt(), true, sessions, rangeLabel)
 
 private fun midnightToday(): Calendar = Calendar.getInstance().apply {
     set(Calendar.HOUR_OF_DAY, 0)

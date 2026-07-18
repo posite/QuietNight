@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,8 +22,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -87,7 +88,10 @@ class MainActivity : ComponentActivity() {
                     onStopMonitoring = { viewModel.stopMonitoring() },
                     onThresholdChange = { settingsViewModel.setThreshold(it) },
                     onVibrationToggle = { settingsViewModel.setVibrationEnabled(it) },
-                    onVibrationStrengthChange = { settingsViewModel.setVibrationStrength(it) }
+                    onVibrationStrengthChange = { settingsViewModel.setVibrationStrength(it) },
+                    onRecordClipsToggle = { settingsViewModel.setRecordClips(it) },
+                    onResetData = { viewModel.clearAllSessions() },
+                    clipProvider = { date -> viewModel.clipsForDate(date) }
                 )
 
                 if (showMicDialog) {
@@ -133,42 +137,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // 런타임 요청이 필요한 위험 권한만 요청한다.
+    // VIBRATE / FOREGROUND_SERVICE / FOREGROUND_SERVICE_MICROPHONE 은 설치 시 자동 부여되는
+    // normal 권한이라 런타임 요청 대상이 아니다(매니페스트 선언만으로 충분).
     private fun checkPermissions() {
         val permissionsToRequest = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.VIBRATE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsToRequest.add(Manifest.permission.VIBRATE)
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.FOREGROUND_SERVICE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsToRequest.add(Manifest.permission.FOREGROUND_SERVICE)
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.FOREGROUND_SERVICE_MICROPHONE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                permissionsToRequest.add(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
-            }
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         if (ContextCompat.checkSelfPermission(
                 this,
@@ -180,8 +160,6 @@ class MainActivity : ComponentActivity() {
 
         if (permissionsToRequest.isNotEmpty()) {
             permissionsLauncher.launch(permissionsToRequest.toTypedArray())
-        } else {
-            Log.d("Main", "All granted!!")
         }
     }
 }
@@ -194,14 +172,18 @@ fun QuietNightApp(
     onStopMonitoring: () -> Unit,
     onThresholdChange: (Int) -> Unit,
     onVibrationToggle: (Boolean) -> Unit,
-    onVibrationStrengthChange: (Int) -> Unit
+    onVibrationStrengthChange: (Int) -> Unit,
+    onRecordClipsToggle: (Boolean) -> Unit,
+    onResetData: () -> Unit,
+    clipProvider: suspend (Long) -> List<com.example.quietnight.data.SnoreClip>
 ) {
     val navController = rememberNavController()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 24.dp)
+            .statusBarsPadding()        // 상태바 높이만큼 실제 인셋 적용(기기별 노치 대응)
+            .navigationBarsPadding()    // 하단 제스처/네비게이션 바 위로 컨텐츠 배치
     ) {
 
         NavHost(
@@ -217,14 +199,28 @@ fun QuietNightApp(
                     state = state,
                     onOpenSettings = { navController.navigate(Screen.Settings.route) }
                 ) {
-                    if (state.isMonitoring) onStopMonitoring() else onStartMonitoring()
+                    if (state.isMonitoring) {
+                        onStopMonitoring()
+                    } else {
+                        onStartMonitoring()
+                        // 측정 시작과 동시에 실시간 모니터 화면으로 이동
+                        navController.navigate(Screen.Monitor.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 }
             }
             composable(Screen.Monitor.route) {
-                MonitorScreen(state) { onStopMonitoring() }
+                MonitorScreen(
+                    state = state,
+                    onStart = onStartMonitoring,
+                    onStop = onStopMonitoring
+                )
             }
             composable(Screen.Analyze.route) {
-                AnalyzeScreen(state)
+                AnalyzeScreen(state, clipProvider = clipProvider)
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
@@ -232,6 +228,8 @@ fun QuietNightApp(
                     onThresholdChange = onThresholdChange,
                     onVibrationToggle = onVibrationToggle,
                     onVibrationStrengthChange = onVibrationStrengthChange,
+                    onRecordClipsToggle = onRecordClipsToggle,
+                    onResetData = onResetData,
                     onBack = { navController.popBackStack() }
                 )
             }

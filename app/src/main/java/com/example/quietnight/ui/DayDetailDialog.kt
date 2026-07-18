@@ -1,6 +1,7 @@
 package com.example.quietnight.ui
 
 import android.icu.util.Calendar
+import android.media.MediaPlayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -10,14 +11,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,11 +43,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.quietnight.data.SleepSession
+import com.example.quietnight.data.SnoreClip
 import java.text.DecimalFormat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
-fun DayDetailDialog(session: SleepSession, onDismiss: () -> Unit) {
+fun DayDetailDialog(
+    session: SleepSession,
+    clipProvider: suspend (Long) -> List<SnoreClip> = { emptyList() },
+    onDismiss: () -> Unit
+) {
     val samples = session.timelineCsv.split(",").mapNotNull { it.toIntOrNull() }
+    val clips by produceState(initialValue = emptyList<SnoreClip>(), session.date) {
+        value = clipProvider(session.date)
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -69,6 +95,166 @@ fun DayDetailDialog(session: SleepSession, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 TimelineChart(samples = samples)
+
+                if (samples.size >= 2) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "총 ${samples.size}분 기록",
+                            color = MaterialTheme.colorScheme.outline,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "최고 ${samples.max()}dB",
+                            color = MaterialTheme.colorScheme.outline,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                ClipSection(clips = clips)
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("닫기") }
+                }
+            }
+        }
+    }
+}
+
+// 해당 날짜에 저장된 코골이 소리 클립 목록 + 재생. 클립이 없으면 아무것도 그리지 않는다.
+@Composable
+private fun ClipSection(clips: List<SnoreClip>) {
+    if (clips.isEmpty()) return
+
+    var playingId by remember { mutableStateOf<Long?>(null) }
+    val playerHolder = remember { mutableStateOf<MediaPlayer?>(null) }
+
+    fun stop() {
+        playerHolder.value?.let { runCatching { it.release() } }
+        playerHolder.value = null
+        playingId = null
+    }
+
+    fun play(clip: SnoreClip) {
+        stop()
+        val mp = MediaPlayer()
+        try {
+            mp.setDataSource(clip.filePath)
+            mp.setOnCompletionListener { stop() }
+            mp.setOnErrorListener { _, _, _ -> stop(); true }
+            mp.setOnPreparedListener { it.start() }
+            mp.prepareAsync()
+            playerHolder.value = mp
+            playingId = clip.id
+        } catch (_: Exception) {
+            runCatching { mp.release() }
+            stop()
+        }
+    }
+
+    DisposableEffect(Unit) { onDispose { stop() } }
+
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = "코골이 소리 ${clips.size}개",
+        color = MaterialTheme.colorScheme.onSurface,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    LazyColumn(modifier = Modifier.heightIn(max = 176.dp)) {
+        items(clips) { clip ->
+            ClipRow(
+                clip = clip,
+                isPlaying = playingId == clip.id,
+                onToggle = { if (playingId == clip.id) stop() else play(clip) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClipRow(clip: SnoreClip, isPlaying: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = clipTime(clip.timestamp),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 13.sp
+            )
+            Text(
+                text = "${clip.dbLevel}dB · ${DecimalFormat("#.#").format(clip.durationMs / 1000.0)}초",
+                color = MaterialTheme.colorScheme.outline,
+                fontSize = 11.sp
+            )
+        }
+        IconButton(onClick = onToggle) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                contentDescription = if (isPlaying) "정지" else "재생",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+private fun clipTime(ts: Long): String =
+    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ts))
+
+// 주간/월간 막대 탭 시: 해당 구간 집계 요약
+@Composable
+fun AggregateDetailDialog(title: String, sessions: List<SleepSession>, onDismiss: () -> Unit) {
+    val nights = sessions.size
+    val avgScore = if (nights > 0) sessions.map { it.score }.average().toInt() else 0
+    val totalSnoreMin = sessions.sumOf { it.snoreTime } / 60000
+    val best = sessions.maxOfOrNull { it.score } ?: 0
+    val worst = sessions.minOfOrNull { it.score } ?: 0
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    DetailStat("평균 점수", "$avgScore")
+                    DetailStat("기록 일수", "${nights}일")
+                    DetailStat("총 코골이", "${totalSnoreMin}분")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    DetailStat("최고 점수", "$best")
+                    DetailStat("최저 점수", "$worst")
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

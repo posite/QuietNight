@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 초기 윈도우 배경(Compose 라이트 배경과 일치). 다크는 values-night 참조. -->
+    <color name="window_background">#FFF8F9FA</color>
 </resources>

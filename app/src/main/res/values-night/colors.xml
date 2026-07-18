@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 초기 윈도우 배경(Compose 다크 배경과 일치). -->
+    <color name="window_background">#FF0D1117</color>
+</resources>

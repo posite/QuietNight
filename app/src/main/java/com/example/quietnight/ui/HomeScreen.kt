@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.quietnight.ui.theme.QuietNightTheme
+import kotlin.math.abs
 
 @Composable
 fun HomeScreen(state: SnoreState, onOpenSettings: () -> Unit, onMonitorClicked: () -> Unit) {
@@ -62,53 +63,24 @@ fun HomeScreen(state: SnoreState, onOpenSettings: () -> Unit, onMonitorClicked: 
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 2x2 통계 그리드
+            // 2x2 통계 그리드 (어제 대비 증감. 점수는 오를수록, 코골이는 줄수록 긍정)
+            val scoreDelta = percentDelta(state.todayScore, state.prevScore, higherIsBetter = true)
+            val snoreDelta =
+                percentDelta(state.todaySnoreTime, state.prevSnoreTime, higherIsBetter = false)
             Row(modifier = Modifier.fillMaxWidth()) {
-                var snoreDiff = 0.0
-                var scoreDiff = 0.0
-                var scoreDiffStr = ""
-                var snoreDiffStr = ""
-                var scoreDiffColor = Color.Black
-                var snoreDiffColor = Color.Black
-
-                if (state.prevScore != 0) {
-                    scoreDiff =
-                        (state.todayScore - state.prevScore).toDouble() / state.prevScore * 100
-
-                    snoreDiff =
-                        (state.todaySnoreTime - state.prevSnoreTime).toDouble() / state.prevSnoreTime * 100
-                    scoreDiffStr = if (scoreDiff > 0) {
-                        "↑ ${DecimalFormat("#.##").format(scoreDiff)}%"
-                    } else if (scoreDiff < 0) {
-                        "↓ ${DecimalFormat("#.##").format(scoreDiff)}%"
-                    } else {
-                        ""
-                    }
-                    scoreDiffColor = if (scoreDiff > 0) Color(0xFF4ADE80) else Color.Red
-
-                    snoreDiffStr = if (snoreDiff > 0) {
-                        "↑ ${DecimalFormat("#.##").format(snoreDiff)}%"
-                    } else if (snoreDiff < 0) {
-                        "↓ ${DecimalFormat("#.##").format(snoreDiff)}%"
-                    } else {
-                        ""
-                    }
-                    snoreDiffColor = if (snoreDiff > 0) Color.Red else Color(0xFF4ADE80)
-                }
-
                 StatCard(
                     "수면 점수",
                     "${state.todayScore}",
-                    scoreDiffStr,
-                    scoreDiffColor,
+                    scoreDelta.text,
+                    scoreDelta.color,
                     Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 StatCard(
                     "코골이 시간",
                     "${DecimalFormat("#.#").format(state.todaySnoreTime.toDouble() / 60000)}분",
-                    snoreDiffStr,
-                    snoreDiffColor,
+                    snoreDelta.text,
+                    snoreDelta.color,
                     Modifier.weight(1f)
                 )
             }
@@ -127,7 +99,7 @@ fun HomeScreen(state: SnoreState, onOpenSettings: () -> Unit, onMonitorClicked: 
                             color = MaterialTheme.colorScheme.primary
                         )
                         state.recentLogs.forEach { log ->
-                            Text(log, color = Color.Gray, fontSize = 10.sp)
+                            Text(log, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                         }
                     }
                 }
@@ -143,7 +115,8 @@ fun HomeScreen(state: SnoreState, onOpenSettings: () -> Unit, onMonitorClicked: 
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (state.isMonitoring) Color.Gray else MaterialTheme.colorScheme.primary
+                    containerColor = if (state.isMonitoring) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -161,7 +134,7 @@ fun StatCard(label: String, value: String, badge: String, diffColor: Color, modi
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(label, color = Color.Gray, fontSize = 12.sp)
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             Text(
                 value,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -173,4 +146,18 @@ fun StatCard(label: String, value: String, badge: String, diffColor: Color, modi
     }
 }
 
-val percentFormatter = DecimalFormat("#.##")
+// 어제 대비 증감 표시(문구 + 색). 분모가 0이면 비교 불가로 빈 값 반환(∞/NaN 방지).
+private data class PercentDelta(val text: String, val color: Color)
+
+private fun percentDelta(current: Number, previous: Number, higherIsBetter: Boolean): PercentDelta {
+    val prev = previous.toDouble()
+    val cur = current.toDouble()
+    if (prev == 0.0) return PercentDelta("", Color.Unspecified)
+    val pct = (cur - prev) / prev * 100
+    if (pct == 0.0) return PercentDelta("", Color.Unspecified)
+    val isUp = pct > 0
+    val isGood = if (higherIsBetter) isUp else !isUp
+    val arrow = if (isUp) "↑" else "↓"
+    val color = if (isGood) Color(0xFF4ADE80) else Color(0xFFEF4444)
+    return PercentDelta("$arrow ${DecimalFormat("#.#").format(abs(pct))}%", color)
+}

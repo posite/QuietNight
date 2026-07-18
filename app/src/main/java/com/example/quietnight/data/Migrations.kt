@@ -32,3 +32,25 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
     }
 }
+
+/**
+ * v5 → v6: 코골이 오디오 클립 테이블(snore_clips) 추가.
+ * CREATE TABLE / CREATE INDEX 는 Room 이 기대하는 6.json 스키마와 정확히 일치해야 한다.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `snore_clips` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`date` INTEGER NOT NULL, " +
+                "`timestamp` INTEGER NOT NULL, " +
+                "`dbLevel` INTEGER NOT NULL, " +
+                "`filePath` TEXT NOT NULL, " +
+                "`durationMs` INTEGER NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_snore_clips_date` " +
+                "ON `snore_clips` (`date`)"
+        )
+    }
+}
