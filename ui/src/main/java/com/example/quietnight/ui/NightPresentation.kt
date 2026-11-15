@@ -17,11 +17,29 @@ internal fun measurementLabel(session: SleepSession): String = when (session.ins
     MeasurementQuality.RECORDED -> "오디오 읽기 확인"
 }
 
-internal fun vibrationReport(session: SleepSession): String {
+internal data class VibrationCounts(
+    val total: Int,
+    val quieter: Int,
+    val similarOrLouder: Int,
+    val incomplete: Int
+)
+
+internal fun vibrationCounts(session: SleepSession): VibrationCounts {
     val events = session.insights.vibrations
     val reduced = events.count { event -> event.after?.let { event.before - it >= 3 } == true }
     val unknown = events.count { it.after == null }
-    return "진동 요청 ${events.size}회 · 소리 감소 ${reduced}회 · 변화 작음/증가 ${events.size - reduced - unknown}회 · 비교 불가 ${unknown}회"
+    return VibrationCounts(events.size, reduced, events.size - reduced - unknown, unknown)
+}
+
+internal fun vibrationReport(session: SleepSession): String {
+    val counts = vibrationCounts(session)
+    if (counts.total == 0) return "진동 알림 기록이 없어요."
+    return listOf(
+        "진동 알림 ${counts.total}회",
+        "알림 후 소리가 작아짐 ${counts.quieter}회",
+        "알림 후 소리가 비슷하거나 커짐 ${counts.similarOrLouder}회",
+        "소리 기록 부족으로 비교하지 못함 ${counts.incomplete}회"
+    ).joinToString("\n")
 }
 
 internal fun MorningFeedback.label(): String = when (this) {

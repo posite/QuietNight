@@ -57,7 +57,7 @@ class BottomNavAndEmptyAnalysisTest {
                         state = SnoreState(), settings = AppSettings(themeMode = mode),
                         onStartMonitoring = onStart, onStopMonitoring = {},
                         onThresholdChange = {}, onVibrationToggle = {}, onVibrationStrengthChange = {},
-                        onRecordClipsToggle = {}, onResetData = {}, onFeedback = { _, _ -> },
+                        onRecordClipsToggle = {}, onResetData = {},
                         onApplyGentle = {}, onGentleVibration = {}, onThemeModeChange = {},
                         clipProvider = { emptyList() }
                     )

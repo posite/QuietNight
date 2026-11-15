@@ -17,7 +17,6 @@ import java.time.format.DateTimeFormatter
 internal fun NightJournal(
     state: SnoreState,
     onShowCharts: () -> Unit,
-    onFeedback: (Long, MorningFeedback) -> Unit,
     onApplyGentle: () -> Unit,
     clipProvider: suspend (Long) -> List<SnoreClip> = { emptyList() },
     onOpenMonitor: () -> Unit = {}
@@ -54,7 +53,7 @@ internal fun NightJournal(
                         NightPostcardArt(session.timelineCsv)
                         if (postcardLevels(session.timelineCsv).isEmpty()) Text("1분 단위 소리 기록이 아직 부족해요.")
                         Text(measurementLabel(session))
-                        Text(vibrationReport(session), style = MaterialTheme.typography.bodySmall)
+                        VibrationSummaryCard(session)
                         TextButton(onClick = { selectedDate = session.date }) { Text("엽서와 성적표 열기") }
                     }
                 }
@@ -62,51 +61,26 @@ internal fun NightJournal(
         }
     }
     state.sessionHistory.firstOrNull { it.date == selectedDate }?.let { session ->
-        DayDetailDialog(session, clipProvider, onFeedback = onFeedback,
-            feedbackEnabled = !state.isMonitoring, suggestGentle = state.suggestGentleVibration,
+        DayDetailDialog(session, clipProvider,
+            isMonitoring = state.isMonitoring, suggestGentle = state.suggestGentleVibration,
             onApplyGentle = onApplyGentle, message = state.journalMessage,
             onDismiss = { selectedDate = null })
     }
 }
 
 @Composable
-internal fun NightReportContent(
+internal fun NightVibrationReport(
     session: SleepSession,
-    feedbackEnabled: Boolean,
-    onFeedback: (Long, MorningFeedback) -> Unit,
+    isMonitoring: Boolean,
     suggestGentle: Boolean,
     onApplyGentle: () -> Unit,
     message: String?
 ) {
-    val insights = session.insights
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        NightPostcardArt(session.timelineCsv)
-        Text("별이 높을수록 소리가 컸어요. 수면 단계나 숙면을 나타내지는 않아요.",
-            style = MaterialTheme.typography.bodySmall)
-        Text("측정 확인 · ${measurementLabel(session)}", style = MaterialTheme.typography.titleSmall)
-        Text("오디오 ${insights.observedMs / 1000}초 · 확인된 누락 ${insights.missingMs / 1000}초",
-            style = MaterialTheme.typography.bodySmall)
-        if (insights.ambientMs > 0) Text(
-            "시작 환경 확인: ${insights.ambientMs / 1000}초 중 ${insights.ambientLoudMs / 1000}초가 감지 기준 초과",
-            style = MaterialTheme.typography.bodySmall)
         Text("진동 성적표", style = MaterialTheme.typography.titleMedium)
-        Text(vibrationReport(session))
-        Text(OBSERVATION_NOTICE, style = MaterialTheme.typography.bodySmall)
-        insights.vibrations.forEachIndexed { index, event ->
-            Text("${index + 1}회 · 이전 평균 ${event.before} → 이후 ${event.after?.let { "평균 $it" } ?: "비교 불가"}",
-                style = MaterialTheme.typography.bodySmall)
-        }
-        Text("아침에는 어땠나요?", style = MaterialTheme.typography.titleSmall)
-        if (!feedbackEnabled) Text("측정을 종료한 뒤 답변할 수 있어요.")
-        if (insights.vibrations.isEmpty()) Text("진동 요청 기록이 없어 진동 피드백을 받지 않아요.")
-        listOf(MorningFeedback.COMFORTABLE, MorningFeedback.DISTURBED, MorningFeedback.NONE).forEach { value ->
-            OutlinedButton(onClick = { onFeedback(session.date, value) },
-                enabled = feedbackEnabled && insights.vibrations.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-                Text(value.label() + if (value != MorningFeedback.NONE && session.feedback == value) " · 선택됨" else "")
-            }
-        }
+        VibrationSummaryCard(session)
         message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        if (suggestGentle) GentleSuggestion(!feedbackEnabled, onApplyGentle)
+        if (suggestGentle) GentleSuggestion(isMonitoring, onApplyGentle)
     }
 }
 

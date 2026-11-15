@@ -81,7 +81,7 @@ fun MonitorScreen(state: SnoreState, onStart: () -> Unit, onStop: () -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "감지 기준 ${state.threshold}dB · PCM 진폭 기준",
+            text = "감지 기준 ${state.threshold} dB",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )

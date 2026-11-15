@@ -104,7 +104,6 @@ class MainActivity : ComponentActivity() {
                     onVibrationStrengthChange = { settingsViewModel.setVibrationStrength(it) },
                     onRecordClipsToggle = { settingsViewModel.setRecordClips(it) },
                     onResetData = { viewModel.clearAllSessions() },
-                    onFeedback = viewModel::saveMorningFeedback,
                     onApplyGentle = viewModel::applyGentleSuggestion,
                     onGentleVibration = settingsViewModel::setGentleVibration,
                     onThemeModeChange = settingsViewModel::setThemeMode,
@@ -192,7 +191,6 @@ fun QuietNightApp(
     onVibrationStrengthChange: (Int) -> Unit,
     onRecordClipsToggle: (Boolean) -> Unit,
     onResetData: () -> Unit,
-    onFeedback: (Long, com.example.quietnight.domain.model.MorningFeedback) -> Unit,
     onApplyGentle: () -> Unit,
     onGentleVibration: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -249,7 +247,7 @@ fun QuietNightApp(
                 )
             }
             composable(Screen.Analyze.route) {
-                AnalyzeScreen(state, clipProvider = clipProvider, onFeedback = onFeedback,
+                AnalyzeScreen(state, clipProvider = clipProvider,
                     onApplyGentle = onApplyGentle, onOpenMonitor = {
                         navController.navigate(Screen.Monitor.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }

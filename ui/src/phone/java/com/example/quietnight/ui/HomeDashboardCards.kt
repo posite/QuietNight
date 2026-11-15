@@ -129,11 +129,6 @@ internal fun HomePreparationCard() {
                 "밤새 측정할 수 있도록 전원을 준비해 주세요.")
             HomePreparationTip(Icons.Rounded.Smartphone, "휴대폰을 침대 가까이에",
                 "이불에 덮이지 않는 안정된 곳에 놓아 주세요.")
-            Text("소리 기록 안내", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary)
-            Text("소리를 기록하며, 실제 수면 여부나 수면 단계를 판단하지 않아요.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

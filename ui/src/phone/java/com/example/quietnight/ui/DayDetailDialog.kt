@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.quietnight.domain.model.SleepSession
 import com.example.quietnight.domain.model.SnoreClip
-import com.example.quietnight.domain.model.MorningFeedback
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,8 +55,7 @@ import java.util.Locale
 fun DayDetailDialog(
     session: SleepSession,
     clipProvider: suspend (Long) -> List<SnoreClip> = { emptyList() },
-    onFeedback: (Long, MorningFeedback) -> Unit = { _, _ -> },
-    feedbackEnabled: Boolean = true,
+    isMonitoring: Boolean = false,
     suggestGentle: Boolean = false,
     onApplyGentle: () -> Unit = {},
     message: String? = null,
@@ -84,7 +82,9 @@ fun DayDetailDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                NightReportContent(session, feedbackEnabled, onFeedback, suggestGentle, onApplyGentle, message)
+                NightPostcardArt(session.timelineCsv)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("별이 높을수록 소리가 컸어요.", style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
@@ -125,6 +125,9 @@ fun DayDetailDialog(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                NightVibrationReport(session, isMonitoring, suggestGentle, onApplyGentle, message)
 
                 ClipSection(clips = clips)
 

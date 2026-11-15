@@ -63,6 +63,8 @@ class HomeDashboardTest {
         compose.onNodeWithText("오늘 밤 준비").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("충전기를 연결해 주세요").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("휴대폰을 침대 가까이에").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("소리 기록 안내").assertDoesNotExist()
+        compose.onNodeWithText("소리를 기록하며, 실제 수면 여부나 수면 단계를 판단하지 않아요.").assertDoesNotExist()
         compose.onNodeWithText("최근 밤의 기록").assertDoesNotExist()
         compose.onNodeWithText("수면 시작하기").assertIsDisplayed().performClick()
         assertEquals(1, starts)
@@ -72,7 +74,7 @@ class HomeDashboardTest {
         var starts = 0
         showHome(mode, fontScale = 2f, onMonitor = { starts++ })
         compose.onNodeWithText("첫 밤을 준비해 볼까요?").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("소리 기록 안내").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("이불에 덮이지 않는 안정된 곳에 놓아 주세요.").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("수면 시작하기").assertIsDisplayed().performClick()
         assertEquals(1, starts)
     }
@@ -85,7 +87,7 @@ class HomeDashboardTest {
                 settings = AppSettings(themeMode = mode),
                 onStartMonitoring = { starts++ }, onStopMonitoring = {},
                 onThresholdChange = {}, onVibrationToggle = {}, onVibrationStrengthChange = {},
-                onRecordClipsToggle = {}, onResetData = {}, onFeedback = { _, _ -> },
+                onRecordClipsToggle = {}, onResetData = {},
                 onApplyGentle = {}, onGentleVibration = {}, onThemeModeChange = {},
                 clipProvider = { emptyList() }
             )

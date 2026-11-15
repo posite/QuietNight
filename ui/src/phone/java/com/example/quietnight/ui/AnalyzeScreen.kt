@@ -21,7 +21,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.example.quietnight.domain.model.MorningFeedback
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +40,6 @@ import com.example.quietnight.domain.model.SnoreClip
 fun AnalyzeScreen(
     state: SnoreState,
     clipProvider: suspend (Long) -> List<SnoreClip> = { emptyList() },
-    onFeedback: (Long, MorningFeedback) -> Unit = { _, _ -> },
     onApplyGentle: () -> Unit = {},
     onOpenMonitor: () -> Unit = {}
 ) {
@@ -54,7 +52,7 @@ fun AnalyzeScreen(
     val hasAnyData = bars.any { it.hasData }
 
     if (showJournal) {
-        NightJournal(state, { showJournal = false }, onFeedback, onApplyGentle, clipProvider,
+        NightJournal(state, { showJournal = false }, onApplyGentle, clipProvider,
             onOpenMonitor = onOpenMonitor)
         return
     }
@@ -102,8 +100,7 @@ fun AnalyzeScreen(
             DayDetailDialog(
                 session = state.sessionHistory.firstOrNull { it.date == bar.sessions.first().date } ?: bar.sessions.first(),
                 clipProvider = clipProvider,
-                onFeedback = onFeedback,
-                feedbackEnabled = !state.isMonitoring,
+                isMonitoring = state.isMonitoring,
                 suggestGentle = state.suggestGentleVibration,
                 onApplyGentle = onApplyGentle,
                 message = state.journalMessage,
