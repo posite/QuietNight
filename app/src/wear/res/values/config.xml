@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 복원된 사용자 설정에 관계없이 워치에서는 소리 파일 녹음을 비활성화한다. -->
+    <bool name="supports_snore_clips">false</bool>
+</resources>

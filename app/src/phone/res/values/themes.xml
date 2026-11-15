@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose가 그려지기 전에도 밤 테마와 같은 배경을 보여 준다. -->
+    <style name="Theme.QuietNight" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

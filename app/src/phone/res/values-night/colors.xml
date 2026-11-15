@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 시스템 모드가 바뀌어도 QuietNight의 밤 배경을 유지한다. -->
+    <color name="window_background">#FF101827</color>
+</resources>

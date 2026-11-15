@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 녹음과 수면 기록은 기기 내부에만 보관한다. -->
+    <exclude domain="file" path="snore_clips/" />
+    <exclude domain="database" path="." />
+</full-backup-content>

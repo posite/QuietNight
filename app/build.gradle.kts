@@ -1,9 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.kotlin.parcelize)
 }
 
 android {
@@ -16,12 +14,25 @@ android {
 
     defaultConfig {
         applicationId = "com.example.quietnight"
-        minSdk = 28
         targetSdk = 36
-        versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions += "device"
+    productFlavors {
+        create("phone") {
+            dimension = "device"
+            minSdk = 28
+            versionCode = 1
+        }
+        create("wear") {
+            dimension = "device"
+            minSdk = 30
+            // 기존 워치 APK의 버전 코드와 applicationId를 유지한다.
+            versionCode = 1000001
+        }
     }
 
     buildTypes {
@@ -37,49 +48,21 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    buildFeatures {
-        compose = true
-    }
-}
-
-// Room 스키마를 export 해서 마이그레이션 검증/작성 근거로 사용
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
+    sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.lifecycle.service)
+    implementation(project(":domain"))
+    implementation(project(":data"))
+    implementation(project(":ui"))
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    androidTestImplementation(libs.room.runtime)
+    androidTestImplementation(libs.kotlinx.coroutines.core)
 
     //hilt
     implementation(libs.hilt)
     ksp(libs.hilt.compiler)
 
-    //room
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
-
-    //viewmodel
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
-
-    //navigation
-    implementation(libs.androidx.navigation.compose)
-
-    //icons
-    implementation(libs.icons)
 }
